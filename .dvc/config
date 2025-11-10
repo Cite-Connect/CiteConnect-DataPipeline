@@ -1,0 +1,5 @@
+[core]
+    remote = gcs
+['remote "gcs"']
+    url = gs://citeconnect-test-bucket/dvc-cache
+    credentialpath = /opt/airflow/configs/credentials/gcs-key.json
