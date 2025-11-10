@@ -1,0 +1,682 @@
+[
+    {
+        "run_timestamp": "2025-10-28T21:06:13.585731",
+        "params": {
+            "max_papers": 10,
+            "batch_size": 5,
+            "domain": "healthcare"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.41,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10
+        }
+    },
+    {
+        "run_timestamp": "2025-10-28T21:16:32.742534",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.44,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "statistics"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-28T21:19:27.411234",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.47,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "statistics"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-28T21:21:35.142089",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.47,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "statistics"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-28T21:22:34.563011",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.5,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-28T22:20:00.662647",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.53,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-28T22:25:02.328967",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.53,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-28T22:45:46.981220",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.56,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:04:42.379365",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.59,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:05:44.637169",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.59,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:07:32.325063",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.62,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:08:34.607736",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.62,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:29:06.334221",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.64,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "healthcare"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:37:41.705803",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.67,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "healthcare"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:38:45.615681",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.7,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "healthcare"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:43:22.153750",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.73,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "healthcare"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:45:49.903599",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.76,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "healthcare"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:52:48.379166",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.79,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "healthcare"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T01:54:30.630310",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.82,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "healthcare"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T02:23:11.434282",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.85,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T02:24:13.248228",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.85,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T02:35:49.244295",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.88,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T02:39:17.751332",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.91,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T02:41:04.458029",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.94,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T05:47:33.468255",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.97,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T05:48:38.434082",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.97,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T05:55:09.037154",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.0,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T05:56:13.555546",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.0,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:12:22.077096",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.06,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:13:25.632134",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.06,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:28:25.209748",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.09,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:29:29.465399",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.09,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:32:18.907072",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.11,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "quantum computing",
+                "ai in healthcare"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:35:52.706774",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.14,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:39:09.795426",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.17,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:45:04.389023",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.2,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:47:45.179079",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.23,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-10-29T06:51:45.232588",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 1.26,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-10T20:20:10.282249",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.09,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-10T21:44:06.673048",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.12,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    }
+]
