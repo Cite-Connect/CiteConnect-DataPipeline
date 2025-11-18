@@ -797,5 +797,22 @@
                 "large language models"
             ]
         }
+    },
+    {
+        "run_timestamp": "2025-11-18T09:13:47.509105",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.11,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 0,
+            "search_terms": [
+                "large language models"
+            ]
+        }
     }
 ]
