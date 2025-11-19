@@ -271,18 +271,78 @@ class EmbeddingService:
                 # Chunk document
                 chunks = self.chunker.chunk_document(cleaned_text, paper_id)
                 
-                if len(cleaned_text) < 200:
-                    logger.debug(f"⏭️  Skipping paper {paper_id} - text too short after cleaning ({len(cleaned_text)} chars)")
-                    stats["skipped"] += 1
-                    continue
-
-                # Chunk document
-                chunks = self.chunker.chunk_document(cleaned_text, paper_id)
-                
                 if not chunks:
                     logger.warning(f"⚠️  No chunks generated for paper {paper_id}")
                     stats["skipped"] += 1
                     continue
+
+                # ========== FIXED: PARSE CITATIONS AND REFERENCES ==========
+                # Handle citations field (parse string/list/array to list)
+                citations_raw = paper.get('citations', [])
+                citations_list = []
+                
+                # Check if citations_raw is not None and not empty
+                if citations_raw is not None:
+                    # Convert numpy array to list if needed
+                    if hasattr(citations_raw, '__iter__') and hasattr(citations_raw, 'tolist'):
+                        # It's a numpy array
+                        citations_list = citations_raw.tolist()
+                    elif isinstance(citations_raw, str):
+                        # String representation of list - parse it
+                        try:
+                            import ast
+                            citations_list = ast.literal_eval(citations_raw)
+                            if not isinstance(citations_list, list):
+                                citations_list = []
+                        except (ValueError, SyntaxError) as e:
+                            logger.debug(f"Failed to parse citations for {paper_id}: {e}")
+                            citations_list = []
+                    elif isinstance(citations_raw, list):
+                        # Already a list - use directly
+                        citations_list = citations_raw
+                    elif pd.isna(citations_raw):
+                        # It's NaN/None
+                        citations_list = []
+                    else:
+                        # Unknown type - log and skip
+                        logger.debug(f"Unknown citations type for {paper_id}: {type(citations_raw)}")
+                        citations_list = []
+                
+                # Handle references field (parse string/list/array to list)
+                references_raw = paper.get('references', [])
+                references_list = []
+                
+                # Check if references_raw is not None and not empty
+                if references_raw is not None:
+                    # Convert numpy array to list if needed
+                    if hasattr(references_raw, '__iter__') and hasattr(references_raw, 'tolist'):
+                        # It's a numpy array
+                        references_list = references_raw.tolist()
+                    elif isinstance(references_raw, str):
+                        # String representation of list - parse it
+                        try:
+                            import ast
+                            references_list = ast.literal_eval(references_raw)
+                            if not isinstance(references_list, list):
+                                references_list = []
+                        except (ValueError, SyntaxError) as e:
+                            logger.debug(f"Failed to parse references for {paper_id}: {e}")
+                            references_list = []
+                    elif isinstance(references_raw, list):
+                        # Already a list - use directly
+                        references_list = references_raw
+                    elif pd.isna(references_raw):
+                        # It's NaN/None
+                        references_list = []
+                    else:
+                        # Unknown type - log and skip
+                        logger.debug(f"Unknown references type for {paper_id}: {type(references_raw)}")
+                        references_list = []
+                
+                logger.debug(
+                    f"Paper {paper_id}: {len(references_list)} references, "
+                    f"{len(citations_list)} citations"
+                )
 
                 # Prepare chunks for embedding with metadata
                 for chunk in chunks:
@@ -297,6 +357,10 @@ class EmbeddingService:
                         'citation_count': int(paper.get('citationCount', 0)) if pd.notna(paper.get('citationCount')) else 0,
                         'extraction_method': str(paper.get('extraction_method', '')) if pd.notna(paper.get('extraction_method')) else '',
                         'content_quality': str(paper.get('content_quality', '')) if pd.notna(paper.get('content_quality')) else '',
+                        
+                        # Add parsed citation lists (guaranteed to be lists)
+                        'references': references_list,  # List of paper IDs (bibliography)
+                        'citations': citations_list     # List of paper IDs (forward citations)
                     }
                     batch_chunks.append(chunk_dict)
 
