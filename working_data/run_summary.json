@@ -712,5 +712,294 @@
                 "large language models"
             ]
         }
+    },
+    {
+        "run_timestamp": "2025-11-18T08:30:44.691538",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.08,
+                "total_chunks": 7
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T08:36:15.616147",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.1,
+                "total_chunks": 7
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T08:46:14.054959",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.11,
+                "total_chunks": 7
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T09:11:25.373541",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.11,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 0,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T09:12:12.963420",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.11,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 0,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T09:13:47.509105",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.11,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 0,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T09:28:34.670480",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.12,
+                "total_chunks": 2
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T18:38:46.041385",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.12,
+                "total_chunks": 2
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T18:55:55.484021",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.12,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 0,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T19:01:29.683888",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.16,
+                "total_chunks": 11
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T19:20:39.134792",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.16,
+                "total_chunks": 2
+            },
+            "total_papers_processed": 10,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T20:43:02.975771",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.78,
+                "total_chunks": 207
+            },
+            "total_papers_processed": 250,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T20:58:05.909631",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.78,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 400,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T22:34:53.840400",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.0,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 700,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T22:47:38.020741",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.0,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 700,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T23:06:13.056961",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.0,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 850,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-18T23:21:51.653095",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.78,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "large language models"
+            ]
+        }
     }
 ]

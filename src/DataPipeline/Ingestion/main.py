@@ -22,70 +22,6 @@ def save_results(data, search_term, output_dir):
 
     upload_to_gcs(filename, GCS_BUCKET, f"raw/{safe_name}.parquet")
 
-# def ingest_papers(search_terms, limit=10, output_dir="data/raw"):
-#     setup_logging()
-#     for term in search_terms:
-#         logging.info(f"Starting: {term}")
-#         papers = search_semantic_scholar(term, limit)
-#         if not papers:
-#             logging.warning(f"No results for: {term}")
-#             continue
-
-#         processed = process_papers(papers, term)
-#         save_results(processed, term, output_dir)
-
-# def collect_papers(search_terms, limit=10, output_dir="data/raw"):
-#     collected_files = []
-    
-#     for term in search_terms:
-#         logging.info(f"Collecting: {term}")
-        
-#         # Get papers from API
-#         papers = search_semantic_scholar(term, limit)
-#         if not papers:
-#             logging.warning(f"No results for: {term}")
-#             continue
-        
-#         # Save raw papers
-#         Path(output_dir).mkdir(parents=True, exist_ok=True)
-#         safe_name = re.sub(r"[^\w\s-]", "", term).replace(" ", "_")
-#         filename = f"{output_dir}/raw_{safe_name}_{int(time.time())}.parquet"
-        
-#         pd.DataFrame(papers).to_parquet(filename, index=False)
-#         logging.info(f"Saved: {filename} ({len(papers)} papers)")
-
-#         save_results(papers, term, output_dir)
-    
-#     return collected_files
-
-
-# def extract_and_process_papers(collection_results, output_dir="data/processed"):
-#     processed_files = []
-
-#     for result in collection_results:
-#         raw_file_path = result['file_path']
-        
-#         logging.info(f"Processing...")
-        
-#         # Load raw papers
-#         raw_papers_df = pd.read_parquet(raw_file_path)
-#         raw_papers = raw_papers_df.to_dict('records')
-        
-#         # Call your existing process_papers function
-#         processed = process_papers(raw_papers, search_term)
-        
-#         if not processed:
-#             continue
-        
-#         # Save processed papers
-#         Path(output_dir).mkdir(parents=True, exist_ok=True)
-#         safe_name = re.sub(r"[^\w\s-]", "", search_term).replace(" ", "_")
-#         processed_filename = f"{output_dir}/processed_{safe_name}_{int(time.time())}.parquet"
-        
-#         pd.DataFrame(processed).to_parquet(processed_filename, index=False)
-#         logging.info(f"Processed: {processed_filename} ({len(processed)} papers)")
-    
-#     return processed_files
 
 def collect_papers_only(search_terms, limit=10, output_dir="data/raw"):
     collection_results = []
@@ -158,7 +94,7 @@ def save_raw_results(data, search_term, output_dir):
     logging.info(f"Saved locally: {local_filename}")
     
     # Upload to GCS in raw folder
-    gcs_path = f"raw/{safe_name}_raw.parquet"
+    gcs_path = f"raw/{local_filename}"
     upload_to_gcs(local_filename, GCS_BUCKET, gcs_path)
     
     return local_filename, gcs_path
