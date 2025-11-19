@@ -40,12 +40,9 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
     - ${AIRFLOW_PROJ_DIR:-.}/src:/opt/airflow/src
     - ${AIRFLOW_PROJ_DIR:-.}/services:/opt/airflow/services
-    - ${AIRFLOW_PROJ_DIR:-.}/preprocessing:/opt/airflow/preprocessing
     - ${AIRFLOW_PROJ_DIR:-.}/utils:/opt/airflow/utils
     - ${AIRFLOW_PROJ_DIR:-.}/tests:/opt/airflow/tests
-    - ${AIRFLOW_PROJ_DIR:-.}/embeddings:/opt/airflow/embeddings
     - ${AIRFLOW_PROJ_DIR:-.}/databias:/opt/airflow/databias
-    - ${AIRFLOW_PROJ_DIR:-.}/gcs-key.json:/opt/airflow/gcs-key.json:ro
     - ${AIRFLOW_PROJ_DIR:-.}/configs:/opt/airflow/configs
     - ${AIRFLOW_PROJ_DIR:-.}/.git:/opt/airflow/.git
     - ${AIRFLOW_PROJ_DIR:-.}/.dvc:/opt/airflow/.dvc
@@ -97,7 +94,7 @@ services:
     <<: *airflow-common
     command: scheduler
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      test: ["CMD", "curl", "--fail", "http://localhost:8973/health"]
       interval: 30s
       timeout: 10s
       retries: 5
