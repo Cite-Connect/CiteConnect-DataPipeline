@@ -8,13 +8,10 @@ import json
 import os
 import subprocess
 
-# Add project to path
 sys.path.insert(0, '/opt/airflow')
 
-# Email settings
-EMAIL_TO = ['aditya811.abhinav@gmail.com']  # Replace with your email
+EMAIL_TO = ['aditya811.abhinav@gmail.com']
 
-# Default arguments with email configuration
 default_args = {
     'owner': 'citeconnect-team',
     'depends_on_past': False,
@@ -31,7 +28,7 @@ dag = DAG(
     'test_citeconnect',
     default_args=default_args,
     description='CiteConnect test pipeline with email notifications',
-    schedule_interval=None,  # Manual trigger only
+    schedule_interval=None,
     catchup=False,
     tags=['test', 'citeconnect']
 )
@@ -89,21 +86,17 @@ def run_unit_tests():
     
     print("Running unit tests...")
     
-    # Change to the project directory
     project_root = '/opt/airflow'
     os.chdir(project_root)
     
-    # Add src to Python path for tests
     if '/opt/airflow/src' not in sys.path:
         sys.path.insert(0, '/opt/airflow/src')
     
-    # Check if test directory exists
     test_dir = os.path.join(project_root, 'tests/unit')
     if not os.path.exists(test_dir):
         print(f"Test directory not found: {test_dir}")
         return ValueError(f"Test directory not found: {test_dir}")
     
-    # List test files
     test_files = []
     for root, dirs, files in os.walk(test_dir):
         for file in files:
@@ -171,7 +164,7 @@ def test_paper_collection():
     import os
     
     # Get search terms from environment variable or use default
-    search_terms_env = os.getenv('SEARCH_TERMS', 'machine learning,computer vision')
+    search_terms_env = os.getenv('SEARCH_TERMS', 'finance, quantum computing, healthcare')
     search_terms = [term.strip() for term in search_terms_env.split(',')]
     limit = int(os.getenv('PAPERS_PER_TERM', '5'))
     
@@ -228,13 +221,9 @@ def embed_stored_data():
         gcs_project_id="strange-calling-476017-r5"
     )
     
-    return service.process_domain("healthcare", batch_size=5, max_papers=10, use_streaming=True)
+    return service.process_domain("healthcare", batch_size=10, max_papers=1000, use_streaming=True)
 
-# ==========================================================
-# 🧠 Bias Analysis and Monitoring (Phases 2–4)
-# ==========================================================
 
-# ----- Phase 2a: Load Data from GCS -----
 def load_bias_data_from_gcs():
     """Load all parquet files from GCS and combine them for bias analysis."""
     import pandas as pd
@@ -301,7 +290,7 @@ def load_bias_data_from_gcs():
         print(f"❌ Error loading data from GCS: {e}")
         raise
 
-# ----- Phase 2b: Run Bias Slicing Script -----
+
 def run_bias_slicing():
     print("Running Fairlearn slicing analysis ...")
     
@@ -331,21 +320,7 @@ def run_bias_slicing():
     print("✅ Bias slicing completed. Results saved in databias/slices/")
     return "bias_slicing_done"
 
-load_bias_data_task = PythonOperator(
-    task_id='load_bias_data_from_gcs',
-    python_callable=load_bias_data_from_gcs,
-    dag=dag,
-    trigger_rule='all_done'  # Run even if upstream tasks are skipped
-)
 
-bias_slicing_task = PythonOperator(
-    task_id='bias_slicing_analysis',
-    python_callable=run_bias_slicing,
-    dag=dag,
-    trigger_rule='all_success'  # Only run if upstream succeeded
-)
-
-# ----- Phase 3: Check Bias and Send Alerts -----
 def check_bias_and_send_alert():
     print("Checking fairness_disparity.json ...")
     
@@ -392,7 +367,6 @@ bias_alert_task = PythonOperator(
     dag=dag
 )
 
-# ----- Phase 4: Bias Mitigation (Optional) -----
 def mitigate_bias():
     import pandas as pd
     df = pd.read_parquet("data/combined_gcs_data_balanced.parquet")
@@ -403,12 +377,6 @@ def mitigate_bias():
     df.to_parquet(balanced_path, index=False)
     print(f"💾 Saved mitigated dataset → {balanced_path}")
     return "bias_mitigated"
-
-bias_mitigation_task = PythonOperator(
-    task_id='bias_mitigation',
-    python_callable=mitigate_bias,
-    dag=dag
-)
 
 def version_embeddings_with_dvc(**context):
     import subprocess
@@ -699,7 +667,6 @@ def send_success_notification(**context):
     </html>
     """
     
-    # Try to send email, but don't fail if credentials are missing
     try:
         smtp_user = os.getenv('SMTP_USER')
         smtp_pass = os.getenv('SMTP_PASSWORD')
@@ -761,7 +728,7 @@ embed_task = PythonOperator(
 schema_stats_task = PythonOperator(
     task_id='generate_schema_and_stats',
     python_callable=generate_schema_and_stats,
-      dag=dag
+    dag=dag
 )
 
 dvc_version_task = PythonOperator(
@@ -777,6 +744,28 @@ notification_task = PythonOperator(
     dag=dag
 )
 
-# Set dependencies
-env_check_task >> gcs_check_task >> api_test_task >> collection_test_task >> preprocess_task >> load_bias_data_task >> bias_slicing_task >> bias_alert_task >> bias_mitigation_task >> embed_task >> dvc_version_task >> schema_stats_task >> notification_task
+load_bias_data_task = PythonOperator(
+    task_id='load_bias_data_from_gcs',
+    python_callable=load_bias_data_from_gcs,
+    dag=dag,
+    trigger_rule='all_done'
+)
+
+bias_slicing_task = PythonOperator(
+    task_id='bias_slicing_analysis',
+    python_callable=run_bias_slicing,
+    dag=dag,
+    trigger_rule='all_success'
+)
+
+bias_mitigation_task = PythonOperator(
+    task_id='bias_mitigation',
+    python_callable=mitigate_bias,
+    dag=dag
+)
+
+
+
+initial_checks = [env_check_task, gcs_check_task, api_test_task]
+initial_checks >> collection_test_task >> preprocess_task >> load_bias_data_task >> bias_slicing_task >> bias_alert_task >> bias_mitigation_task >> embed_task >> dvc_version_task >> schema_stats_task >> notification_task
 
