@@ -10,7 +10,7 @@ import subprocess
 
 sys.path.insert(0, '/opt/airflow')
 
-EMAIL_TO = ['aditya811.abhinav@gmail.com']
+EMAIL_TO = ['anushasrini2001@gmail.com']
 
 default_args = {
     'owner': 'citeconnect-team',
@@ -32,8 +32,6 @@ dag = DAG(
     catchup=False,
     tags=['test', 'citeconnect']
 )
-
-search_terms = ["large language models"]
 
 def check_env_variables():
     semantic_scholar_key = os.getenv('SEMANTIC_SCHOLAR_API_KEY')
@@ -95,7 +93,7 @@ def run_unit_tests():
     test_dir = os.path.join(project_root, 'tests/unit')
     if not os.path.exists(test_dir):
         print(f"Test directory not found: {test_dir}")
-        return ValueError(f"Test directory not found: {test_dir}")
+        return f"ERROR: Test directory not found: {test_dir}"
     
     test_files = []
     for root, dirs, files in os.walk(test_dir):
@@ -150,17 +148,23 @@ def run_unit_tests():
             return "tests_passed"
         else:
             print(f"Unit tests failed with return code: {result.returncode}")
-            return ValueError(f"Unit tests failed. {failed_count} failures, {error_count} errors.")
+            error_msg = f"ERROR: Unit tests failed. {failed_count} failures, {error_count} errors."
+            print(error_msg)
+            return error_msg
             
     except subprocess.TimeoutExpired:
-        return ValueError("Unit tests timed out after 5 minutes")
+        return "ERROR: Unit tests timed out after 5 minutes"
     except FileNotFoundError:
-        return ValueError("pytest not found. Please add pytest to requirements.txt")
+        return "ERROR: pytest not found. Please add pytest to requirements.txt"
     except Exception as e:
-        return ValueError(f"Error running unit tests: {e}")
+        return f"ERROR: Error running unit tests: {e}"
 
 def test_paper_collection():
-    from src.DataPipeline.Ingestion.main import collect_papers_only
+    """
+    Collect papers using async pipeline with overlapping collection/preprocessing.
+    This replaces the old sequential approach with a faster pipeline pattern.
+    """
+    from src.DataPipeline.Ingestion.main import collect_and_process_pipeline
     import os
     
     # Get search terms from environment variable or use default
@@ -170,21 +174,38 @@ def test_paper_collection():
     
     print(f"🔍 Search terms: {search_terms}")
     print(f"📊 Papers per term: {limit}")
+    print(f"🚀 Using async pipeline with overlapping collection/preprocessing")
     
-    results = collect_papers_only(
+    # Use async pipeline (collection and preprocessing overlap)
+    results = collect_and_process_pipeline(
         search_terms=search_terms,
         limit=limit,
-        output_dir="/tmp/test_data/raw"
+        raw_output_dir="/tmp/test_data/raw",
+        processed_output_dir="/tmp/test_data/processed",
+        use_async=True  # Use async pipeline
     )
     
-    print(f"Collection completed: {len(results)} terms processed")
-    print("Files uploaded to GCS:")
-    for result in results:
+    collection_results = results['collection_results']
+    processing_results = results['processing_results']
+    
+    print(f"\n✅ Collection completed: {len(collection_results)} terms processed")
+    print("📤 Raw files uploaded to GCS:")
+    for result in collection_results:
         print(f"  {result['search_term']}: {result['gcs_path']}")
     
-    return results
+    print(f"\n✅ Preprocessing completed: {len(processing_results)} terms processed")
+    print("📤 Processed files uploaded to GCS:")
+    for result in processing_results:
+        print(f"  {result['search_term']}: {result['processed_gcs']}")
+    
+    # Return collection results for backward compatibility with preprocess_papers task
+    return collection_results
 
 def preprocess_papers(**context):
+    """
+    Preprocess papers. Note: If using async pipeline, preprocessing is already done
+    during collection. This task will skip if preprocessing was already completed.
+    """
     print("Testing paper preprocessing...")
 
     ti = context['task_instance']
@@ -193,11 +214,21 @@ def preprocess_papers(**context):
     if not collection_results:
         raise ValueError("No collection results received")
     
+    # Check if preprocessing was already done (async pipeline does both)
+    # If papers were already processed, we can skip this step
+    import os
+    processed_dir = "/tmp/test_data/processed"
+    if os.path.exists(processed_dir) and os.listdir(processed_dir):
+        print("✅ Preprocessing already completed by async pipeline. Skipping...")
+        # Return a placeholder result
+        return [{'search_term': r['search_term'], 'status': 'already_processed'} for r in collection_results]
+    
+    # Fallback: Process if not already done
     from src.DataPipeline.Ingestion.main import process_collected_papers
     
     results = process_collected_papers(
         collection_results=collection_results,
-        output_dir="/tmp/test_data/processed"
+        output_dir=processed_dir
     )
     
     print(f"Processing completed: {len(results)} terms processed")
@@ -350,13 +381,29 @@ def check_bias_and_send_alert():
         <b>Disparity Difference:</b> {disparity_diff:.2f}</p>
         <p>Check the detailed slice report in databias/slices/fairness_disparity.json</p>
         """
-        send_email(
-            to=EMAIL_TO,
-            subject=subject,
-            html_content=html_content
-        )
-        print(f"🚨 Bias alert email sent! Ratio exceeded threshold {THRESHOLD}.")
-        return "alert_sent"
+        try:
+            # Check if SMTP credentials are configured
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_pass = os.getenv('SMTP_PASSWORD')
+            
+            if smtp_user and smtp_pass:
+                send_email(
+                    to=EMAIL_TO,
+                    subject=subject,
+                    html_content=html_content
+                )
+                print(f"🚨 Bias alert email sent! Ratio exceeded threshold {THRESHOLD}.")
+                return "alert_sent"
+            else:
+                print(f"⚠️ SMTP credentials not configured. Skipping email alert.")
+                print(f"🚨 Bias threshold exceeded (ratio: {disparity_ratio:.2f} > {THRESHOLD})")
+                print(f"   To enable email alerts, set SMTP_USER and SMTP_PASSWORD in .env file")
+                return "alert_threshold_exceeded_no_email"
+        except Exception as e:
+            print(f"⚠️ Failed to send email alert: {e}")
+            print(f"🚨 Bias threshold exceeded (ratio: {disparity_ratio:.2f} > {THRESHOLD})")
+            print(f"   Task will continue despite email failure")
+            return "alert_threshold_exceeded_email_failed"
     else:
         print("✅ Bias within acceptable limits. No alert sent.")
         return "no_alert"
@@ -469,6 +516,10 @@ def version_embeddings_with_dvc(**context):
         total_papers = embed_results.get('total_papers', 0)
         run_params = embed_results.get('params', {"status": "unknown"})
         
+        # Get search terms from environment variable (same as test_paper_collection)
+        search_terms_env = os.getenv('SEARCH_TERMS', 'finance, quantum computing, healthcare')
+        search_terms_list = [term.strip() for term in search_terms_env.split(',')]
+        
         summary_list = []
         if os.path.exists(summary_path):
             try:
@@ -489,7 +540,7 @@ def version_embeddings_with_dvc(**context):
                     "total_chunks": embeddings_created
                 },
                 "total_papers_processed": total_papers,
-                "search_terms": search_terms
+                "search_terms": search_terms_list
             }
         }
         
