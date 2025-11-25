@@ -1158,5 +1158,22 @@
                 ""
             ]
         }
+    },
+    {
+        "run_timestamp": "2025-11-25T15:46:18.918978",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 4.52,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                ""
+            ]
+        }
     }
 ]
