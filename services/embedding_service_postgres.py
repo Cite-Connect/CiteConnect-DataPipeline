@@ -259,12 +259,50 @@ class PostgreSQLEmbeddingService:
             logger.error(f"Failed to insert papers: {e}", exc_info=True)
             raise
     
+    async def _get_papers_needing_embeddings(
+    self,
+    papers: List[Dict[str, Any]],
+    model_type: str  # 'minilm' or 'specter'
+    ) -> List[Dict[str, Any]]:
+        """Filter papers to only those missing embeddings."""
+        
+        table_name = f'paper_embeddings_{model_type}'
+        paper_ids = [p['paper_id'] for p in papers]
+        
+        async with self.db_pool.acquire() as conn:
+            # Get papers that already have embeddings
+            existing = await conn.fetch(
+                f"SELECT paper_id FROM {table_name} WHERE paper_id = ANY($1)",
+                paper_ids
+            )
+            existing_ids = {row['paper_id'] for row in existing}
+        
+        # Filter to only papers WITHOUT embeddings
+        papers_needed = [p for p in papers if p['paper_id'] not in existing_ids]
+        
+        logger.info(
+            f"{model_type}: {len(existing_ids)} papers already have embeddings, "
+            f"{len(papers_needed)} need generation"
+        )
+    
+        return papers_needed
+    
     async def _generate_minilm_embeddings(
         self,
         papers: List[Dict[str, Any]],
         batch_size: int
     ) -> int:
         """Generate and store mini-LM embeddings."""
+            
+    # Skip papers that already have embeddings
+        papers_to_embed = await self._get_papers_needing_embeddings(papers, 'minilm')
+    
+        if not papers_to_embed:
+            logger.info("All papers already have mini-LM embeddings, skipping generation")
+            return 0
+    
+        logger.info(f"Generating mini-LM embeddings for {len(papers_to_embed)} papers...")
+    
         logger.info("Generating mini-LM embeddings (384-dim)...")
         
         # Load model
@@ -349,6 +387,16 @@ class PostgreSQLEmbeddingService:
         batch_size: int
     ) -> int:
         """Generate and store SPECTER embeddings."""
+            # Skip papers that already have embeddings
+        papers_to_embed = await self._get_papers_needing_embeddings(papers, 'specter')
+    
+        if not papers_to_embed:
+            logger.info("All papers already have mini-LM embeddings, skipping generation")
+            return 0
+    
+        logger.info(f"Generating SPECTER embeddings for {len(papers_to_embed)} papers...")
+        
+        # Load model
         logger.info("Generating SPECTER embeddings (768-dim)...")
         
         # Load model

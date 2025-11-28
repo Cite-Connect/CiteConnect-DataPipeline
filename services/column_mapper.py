@@ -64,6 +64,21 @@ def sanitize_text(text: Any) -> Optional[str]:
         return None
     
     return text_str
+# Function to sanitize lists using the provided sanitize_text function
+def sanitize_and_filter_id_list(raw_list: Any) -> list[str]:
+    if not isinstance(raw_list, list):
+        # If the data isn't a list (e.g., it's None or NaN), return an empty list
+        return []
+        
+    cleaned_ids = []
+    for item in raw_list:
+        # Use sanitize_text on each individual ID
+        cleaned_id = sanitize_text(item)
+        if cleaned_id:
+            # Only append IDs that are not None and not empty strings after cleaning
+            cleaned_ids.append(cleaned_id)
+            
+    return cleaned_ids
 
 
 def map_parquet_row_to_paper(row: pd.Series, search_term: Optional[str] = None) -> Dict[str, Any]:
@@ -190,9 +205,16 @@ def map_parquet_row_to_paper(row: pd.Series, search_term: Optional[str] = None) 
             intro_length = 0
     
     # NEW: reference_ids and citation_ids (empty for now, teammate will populate)
-    reference_ids = []
+    '''    reference_ids = []
     citation_ids = []
-    
+    '''
+    # Extracting and cleaning the IDs
+    raw_reference_ids = row.get('reference_ids')
+    raw_citation_ids = row.get('citation_ids')
+
+    reference_ids = sanitize_and_filter_id_list(raw_reference_ids)
+    citation_ids = sanitize_and_filter_id_list(raw_citation_ids)
+        
     # NEW: Calculate reference_count from parquet if available
     reference_count = row.get('referenceCount', 0)
     if reference_count is None or pd.isna(reference_count):

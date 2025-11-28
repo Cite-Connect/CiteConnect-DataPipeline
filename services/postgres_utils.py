@@ -85,7 +85,8 @@ class PostgreSQLConnectionPool:
                     password=self.password,
                     min_size=self.min_size,
                     max_size=self.max_size,
-                    command_timeout=180,
+                    command_timeout=300,
+                    statement_cache_size=0,
                     ssl='require',  # ✅ Supabase requires SSL
                     server_settings={
                         'application_name': 'citeconnect_embedding_service'
