@@ -1366,5 +1366,22 @@
                 "computer vision"
             ]
         }
+    },
+    {
+        "run_timestamp": "2025-11-28T05:57:15.777303",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 2.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "machine_learning"
+            ]
+        }
     }
 ]
