@@ -1,5 +1,5 @@
 outs:
-- md5: ee32514f206fd0361517d6718cf1c589
-  size: 2265755
+- md5: ce715ed5944b888ffadb24c57fef7eeb
+  size: 4553605
   hash: md5
   path: embeddings_db.pkl
