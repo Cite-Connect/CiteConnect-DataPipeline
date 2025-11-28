@@ -2,7 +2,6 @@ version: '3.8'
 
 x-airflow-common:
   &airflow-common
-  # Build our custom image
   build: .
   environment:
     &airflow-common-env
@@ -22,22 +21,28 @@ x-airflow-common:
     AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
     AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_USER}
     
-    # env variables for CiteConnect
+    # CiteConnect env variables
     SEMANTIC_SCHOLAR_API_KEY: ${SEMANTIC_SCHOLAR_API_KEY:-}
     SEMANTIC_SCHOLAR_API_KEYS: ${SEMANTIC_SCHOLAR_API_KEYS:-}
     SEARCH_TERMS: ${SEARCH_TERMS:-}
     PAPERS_PER_TERM: ${PAPERS_PER_TERM:-}
     SMTP_USER: ${SMTP_USER}
     SMTP_PASSWORD: ${SMTP_PASSWORD}
-
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/configs/credentials/gcs-key.json
     GCS_BUCKET_NAME: ${GCS_BUCKET_NAME}
     GCS_PROJECT_ID: ${GCS_PROJECT_ID}
-
     LOCAL_EMBEDDINGS_PATH: /opt/airflow/working_data/embeddings_db.pkl
     
+    # Supabase configuration
+    SUPABASE_DB_HOST: ${SUPABASE_DB_HOST:-db.wvvogncqrqzfbfztkwfo.supabase.co}
+    SUPABASE_DB_PORT: ${SUPABASE_DB_PORT:-5432}
+    SUPABASE_DB_NAME: ${SUPABASE_DB_NAME:-postgres}
+    SUPABASE_DB_USER: ${SUPABASE_DB_USER:-postgres}
+    SUPABASE_DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+    MAX_PAPERS_EMBEDDING: ${MAX_PAPERS_EMBEDDING:-1000}
+    EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+    
   volumes:
-    # Mount your project folders
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
@@ -56,9 +61,9 @@ x-airflow-common:
     &airflow-common-depends-on
     postgres:
       condition: service_healthy
+  # Add DNS configuration here
 
 services:
-  # PostgreSQL database for Airflow metadata
   postgres:
     image: postgres:13
     environment:
@@ -73,8 +78,12 @@ services:
       retries: 5
       start_period: 5s
     restart: always
+    networks:
+      - citeconnect-network
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
-  # Airflow web server
   airflow-webserver:
     <<: *airflow-common
     command: webserver
@@ -91,11 +100,21 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+    networks:
+      - citeconnect-network
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    dns_search: []
+    dns_opt:
+      - ndots:0
 
-  # Airflow scheduler
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "db.wvvogncqrqzfbfztkwfo.supabase.co:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8973/health"]
       interval: 30s
@@ -107,15 +126,21 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+    networks:
+      - citeconnect-network
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    dns_search: []
+    dns_opt:
+      - ndots:0
 
-  # Airflow database initialization
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
     command:
       - -c
       - |
-        # Create airflow user and initialize database
         mkdir -p /sources/logs /sources/dags /sources/plugins
         chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
         exec /entrypoint airflow version
@@ -128,6 +153,24 @@ services:
     user: "0:0"
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}:/sources
+    networks:
+      - citeconnect-network
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+# Define custom network with external access
+networks:
+  citeconnect-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: citeconnect0
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.enable_icc: "true"
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
 
 volumes:
   postgres-db-volume:

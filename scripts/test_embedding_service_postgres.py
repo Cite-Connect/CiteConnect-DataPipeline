@@ -52,7 +52,7 @@ async def test_service():
         # Initialize service
         service = PostgreSQLEmbeddingService(
             gcs_bucket=os.getenv('GCS_BUCKET_NAME', 'citeconnect-test-bucket'),
-            gcs_prefix=os.getenv('GCS_PREFIX', 'processed/'),
+            gcs_prefix=os.getenv('GCS_PREFIX', 'processed_v2/'),
             db_config=db_config,
             gcs_project_id=os.getenv('GCS_PROJECT_ID', 'strange-calling-476017-r5')
         )

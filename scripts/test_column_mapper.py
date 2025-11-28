@@ -40,8 +40,10 @@ sample_row = pd.Series({
     'title': 'Machine Learning for Healthcare',
     'abstract': 'This paper discusses machine learning applications in healthcare settings.',
     'introduction': 'Introduction text about ML in healthcare. ' * 10,
+    'tldr': 'Test TLDR summary',  # Changed from 'summary'
     'year': 2024,
     'citationCount': 15,
+    'referenceCount': 25,  # NEW
     'extraction_method': 'arxiv_html',
     'content_quality': 'high',
     'has_intro': True
@@ -50,6 +52,8 @@ sample_row = pd.Series({
 paper = map_parquet_row_to_paper(sample_row, 'healthcare')
 print(f"   Paper ID: {paper['paper_id']}")
 print(f"   Domain: {paper['domain']}")
+print(f"   Sub-domains: {paper['sub_domains']}")  # NEW
+print(f"   Reference count: {paper['reference_count']}")  # NEW
 print(f"   Has intro: {paper['has_introduction']}")
 print(f"   Valid: {validate_paper_data(paper)}")
 

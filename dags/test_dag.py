@@ -10,7 +10,7 @@ import subprocess
 
 sys.path.insert(0, '/opt/airflow')
 
-EMAIL_TO = ['anushasrini2001@gmail.com']
+EMAIL_TO = ['dennismjose26@yahoo.com']
 
 default_args = {
     'owner': 'citeconnect-team',
@@ -237,7 +237,7 @@ def preprocess_papers(**context):
         print(f"  {result['search_term']}: {result['processed_gcs']}")
     
     return results
-
+'''
 def embed_stored_data():
     import sys
     if '/opt/airflow' not in sys.path:
@@ -253,6 +253,131 @@ def embed_stored_data():
     )
     
     return service.process_domain("healthcare", batch_size=10, max_papers=1000, use_streaming=True)
+'''
+def embed_and_store_to_postgres(**context):
+    """
+    Generate embeddings and store in PostgreSQL (Supabase).
+    Replaces the old pickle-based approach.
+    
+    This function:
+    1. Reads papers from GCS processed/ folder
+    2. Inserts papers into PostgreSQL papers table
+    3. Generates mini-LM embeddings (384-dim)
+    4. Generates SPECTER embeddings (768-dim)
+    5. Stores both in respective PostgreSQL tables
+    
+    Returns statistics compatible with DVC tracking.
+    """
+    import asyncio
+    import sys
+    import os
+    from airflow.models import Variable
+    if '/opt/airflow' not in sys.path:
+        sys.path.insert(0, '/opt/airflow')
+    
+    from services.embedding_service_postgres import PostgreSQLEmbeddingService
+    
+    print("="*60)
+    print("EMBEDDING GENERATION (PostgreSQL)")
+    print("="*60)
+    
+    # Database configuration from environment variables
+    '''    
+    db_config = {
+        'host': os.getenv('SUPABASE_DB_HOST', 'db.wvvogncqrqzfbfztkwfo.supabase.co'),
+        'port': int(os.getenv('SUPABASE_DB_PORT', 5432)),
+        'database': os.getenv('SUPABASE_DB_NAME', 'postgres'),
+        'user': os.getenv('SUPABASE_DB_USER', 'postgres'),
+        'password': os.getenv('SUPABASE_DB_PASSWORD'),
+    }'''
+    try:
+        db_config = {
+            'host':Variable.get('SUPABASE_DB_HOST',default_var='db.wvvogncqrqzfbfztkwfo.supabase.co'),
+            'port': int(Variable.get('SUPABASE_DB_PORT',default_var='5432')),
+            'database': Variable.get('SUPABASE_DB_NAME',default_var='postgres'),
+            'user': Variable.get('SUPABASE_DB_USER',default_var='postgres'),
+            'password': Variable.get('SUPABASE_DB_PASSWORD'),
+        }
+    except KeyError:
+        db_config = {
+        'host': os.getenv('SUPABASE_DB_HOST', 'db.wvvogncqrqzfbfztkwfo.supabase.co'),
+        'port': int(os.getenv('SUPABASE_DB_PORT', 5432)),
+        'database': os.getenv('SUPABASE_DB_NAME', 'postgres'),
+        'user': os.getenv('SUPABASE_DB_USER', 'postgres'),
+        'password': os.getenv('SUPABASE_DB_PASSWORD'),
+    }
+
+    # Verify database credentials
+    if not db_config['password']:
+        raise ValueError(
+            "SUPABASE_DB_PASSWORD not set! "
+            "Please set in Airflow Variables or environment."
+        )
+    
+    # GCS configuration
+    gcs_bucket = os.getenv('GCS_BUCKET_NAME', 'citeconnect-test-bucket')
+    gcs_project_id = os.getenv('GCS_PROJECT_ID', 'strange-calling-476017-r5')
+    
+    # Processing configuration
+    max_papers = int(os.getenv('MAX_PAPERS_EMBEDDING', '1000'))  # Limit for safety
+    batch_size = int(os.getenv('EMBEDDING_BATCH_SIZE', '32'))
+    
+    print(f"Configuration:")
+    print(f"  Database: {db_config['user']}@{db_config['host']}")
+    print(f"  GCS Bucket: {gcs_bucket}")
+    print(f"  Max Papers: {max_papers}")
+    print(f"  Batch Size: {batch_size}")
+    
+    try:
+        # Initialize service
+        service = PostgreSQLEmbeddingService(
+            gcs_bucket=gcs_bucket,
+            gcs_prefix='processed_v2/',  # Read from processed folder
+            db_config=db_config,
+            gcs_project_id=gcs_project_id
+        )
+        
+        # Run async pipeline
+        print("\nStarting dual embedding generation...")
+        stats = asyncio.run(
+            service.process_and_store_dual_embeddings(
+                batch_size=batch_size,
+                max_papers=max_papers
+            )
+        )
+        
+        # Log results
+        print("\n" + "="*60)
+        print("EMBEDDING GENERATION COMPLETE")
+        print("="*60)
+        print(f"✅ Papers processed: {stats['processed_papers']}")
+        print(f"✅ mini-LM embeddings: {stats['minilm_embeddings']}")
+        print(f"✅ SPECTER embeddings: {stats['specter_embeddings']}")
+        print(f"✅ Total embeddings: {stats['embedded_chunks']}")
+        print("="*60)
+        
+        # Return stats in format compatible with DVC versioning task
+        # The version_embeddings_with_dvc task expects these fields
+        return {
+            'total_papers': stats['total_papers'],
+            'processed_papers': stats['processed_papers'],
+            'embedded_chunks': stats['embedded_chunks'],  # Total of both models
+            'minilm_embeddings': stats['minilm_embeddings'],
+            'specter_embeddings': stats['specter_embeddings'],
+            'params': {
+                'gcs_bucket': gcs_bucket,
+                'gcs_prefix': 'processed_v2/',
+                'batch_size': batch_size,
+                'max_papers': max_papers,
+                'models': ['all-MiniLM-L6-v2', 'allenai/specter']
+            }
+        }
+    
+    except Exception as e:
+        print(f"\n❌ ERROR: Embedding generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 def load_bias_data_from_gcs():
@@ -504,9 +629,12 @@ def version_embeddings_with_dvc(**context):
             capture_output=True,
             cwd=project_root
         )
-
+        '''
         ti = context['task_instance']
         embed_results = ti.xcom_pull(task_ids='embed_stored_data') or {}
+        '''
+        ti = context['task_instance']
+        embed_results = ti.xcom_pull(task_ids='embed_and_store_to_postgres') or {}
         
         file_size_mb = 0.0
         if os.path.exists(embeddings_path):
@@ -702,7 +830,7 @@ def send_success_notification(**context):
             <li>✅ test_api_connection (Unit Tests)</li>
             <li>✅ test_paper_collection</li>
             <li>✅ preprocess_papers</li>
-            <li>✅ embed_stored_data</li>
+            <li>✅ embed_stored_data_to_postgres</li>
             <li>✅ version_embeddings_dvc (Data Versioning)</li>
             <li>✅ schema validation: SUCCESS</li>
         </ul>
@@ -770,9 +898,17 @@ preprocess_task = PythonOperator(
     dag=dag
 )
 
+'''
 embed_task = PythonOperator(
     task_id='embed_stored_data',
     python_callable=embed_stored_data,
+    dag=dag
+)
+'''
+embed_task = PythonOperator(
+    task_id='embed_and_store_to_postgres',  # New task name
+    python_callable=embed_and_store_to_postgres,  # New function
+    provide_context=True,  # Pass context for XCom
     dag=dag
 )
 
@@ -818,5 +954,7 @@ bias_mitigation_task = PythonOperator(
 
 
 initial_checks = [env_check_task, gcs_check_task, api_test_task]
+'''
 initial_checks >> collection_test_task >> preprocess_task >> load_bias_data_task >> bias_slicing_task >> bias_alert_task >> bias_mitigation_task >> embed_task >> dvc_version_task >> schema_stats_task >> notification_task
-
+'''
+initial_checks >> collection_test_task >> preprocess_task >> load_bias_data_task >> bias_slicing_task >> bias_alert_task >> bias_mitigation_task >> embed_task >> dvc_version_task >> schema_stats_task >> notification_task

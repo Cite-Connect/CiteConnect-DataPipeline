@@ -99,3 +99,5 @@ python-dotenv>=1.0.1
 
 # For JSON and file handling
 pyarrow>=15.0.0
+asyncpg
+

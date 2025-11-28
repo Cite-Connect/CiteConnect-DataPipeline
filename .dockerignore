@@ -2,3 +2,4 @@ logs/
 working_data/
 .git/
 .env
+venv/

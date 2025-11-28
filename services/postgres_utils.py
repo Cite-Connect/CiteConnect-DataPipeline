@@ -8,6 +8,7 @@ import asyncpg
 from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
 import time
+import ssl
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +52,24 @@ class PostgreSQLConnectionPool:
             f"{user}@{host}:{port}/{database} "
             f"(pool size: {min_size}-{max_size})"
         )
-    
     async def create_pool(self):
-        """Create connection pool with retry logic."""
+        """Create connection pool with retry logic and IPv4 resolution."""
+        import socket
+        
+        # Resolve to IPv4 explicitly to avoid IPv6 issues
+        try:
+            addr_info = socket.getaddrinfo(
+                self.host, 
+                self.port, 
+                socket.AF_INET  # Force IPv4
+            )
+            ipv4_address = addr_info[0][4][0]
+            logger.info(f"Resolved {self.host} to IPv4: {ipv4_address}")
+            host_to_use = ipv4_address
+        except socket.gaierror as e:
+            logger.warning(f"Could not resolve {self.host} to IPv4: {e}, using hostname as-is")
+            host_to_use = self.host
+        
         max_retries = 3
         retry_delay = 2
         
@@ -62,19 +78,19 @@ class PostgreSQLConnectionPool:
                 logger.info(f"Creating connection pool (attempt {attempt + 1}/{max_retries})...")
                 
                 self._pool = await asyncpg.create_pool(
-                    host=self.host,
+                    host=host_to_use,  # ✅ Use IPv4 address
                     port=self.port,
                     database=self.database,
                     user=self.user,
                     password=self.password,
                     min_size=self.min_size,
                     max_size=self.max_size,
-                    command_timeout=60,  # 60 second timeout for queries
+                    command_timeout=180,
+                    ssl='require',  # ✅ Supabase requires SSL
                     server_settings={
                         'application_name': 'citeconnect_embedding_service'
                     }
                 )
-                
                 # Test connection
                 async with self._pool.acquire() as conn:
                     await conn.fetchval('SELECT 1')
@@ -116,6 +132,7 @@ async def batch_insert_papers(
 ) -> int:
     """
     Batch insert papers into PostgreSQL with ON CONFLICT handling.
+    Updated for Schema v2.0
     
     Args:
         pool: Connection pool
@@ -135,25 +152,36 @@ async def batch_insert_papers(
         
         try:
             async with pool.acquire() as conn:
-                # Prepare batch insert with ON CONFLICT DO UPDATE
+                # Updated INSERT query for Schema v2.0
                 query = """
                 INSERT INTO papers (
-                    paper_id, title, abstract, introduction, summary,
+                    paper_id, title, abstract, introduction, tldr,
                     authors, year, venue, citation_count,
-                    domain, gcs_pdf_path,
-                    extraction_method, content_quality, has_introduction, intro_length,
-                    ingested_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)
+                    domain, domain_confidence, sub_domains,
+                    reference_ids, citation_ids, reference_count,
+                    quality_score, extraction_method, content_quality,
+                    has_introduction, intro_length,
+                    gcs_pdf_path, ingested_at, updated_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
+                    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $22
+                )
                 ON CONFLICT (paper_id) DO UPDATE SET
                     title = EXCLUDED.title,
                     abstract = EXCLUDED.abstract,
                     introduction = EXCLUDED.introduction,
-                    summary = EXCLUDED.summary,
+                    tldr = EXCLUDED.tldr,
                     authors = EXCLUDED.authors,
                     year = EXCLUDED.year,
                     venue = EXCLUDED.venue,
                     citation_count = EXCLUDED.citation_count,
                     domain = EXCLUDED.domain,
+                    domain_confidence = EXCLUDED.domain_confidence,
+                    sub_domains = EXCLUDED.sub_domains,
+                    reference_ids = EXCLUDED.reference_ids,
+                    citation_ids = EXCLUDED.citation_ids,
+                    reference_count = EXCLUDED.reference_count,
+                    quality_score = EXCLUDED.quality_score,
                     extraction_method = EXCLUDED.extraction_method,
                     content_quality = EXCLUDED.content_quality,
                     has_introduction = EXCLUDED.has_introduction,
@@ -161,35 +189,62 @@ async def batch_insert_papers(
                     updated_at = EXCLUDED.updated_at
                 """
                 
-                # Execute batch
-                await conn.executemany(query, [
-                    (
+                # Prepare batch data matching new schema
+                batch_data = []
+                for paper in batch:
+                    batch_data.append((
                         paper['paper_id'],
                         paper['title'],
                         paper['abstract'],
                         paper['introduction'],
-                        paper['summary'],
+                        paper['tldr'],  # Changed from 'summary'
                         paper['authors'],
                         paper['year'],
                         paper['venue'],
                         paper['citation_count'],
                         paper['domain'],
-                        paper['gcs_pdf_path'],
+                        paper['domain_confidence'],  # NEW
+                        paper['sub_domains'],  # NEW
+                        paper['reference_ids'],  # NEW
+                        paper['citation_ids'],  # NEW
+                        paper['reference_count'],  # NEW
+                        paper['quality_score'],  # NEW
                         paper['extraction_method'],
                         paper['content_quality'],
                         paper['has_introduction'],
                         paper['intro_length'],
+                        paper['gcs_pdf_path'],
                         paper['ingested_at']
-                    )
-                    for paper in batch
-                ])
+                    ))
+                
+                await conn.executemany(query, batch_data)
                 
                 inserted_count += len(batch)
                 logger.info(f"Inserted batch of {len(batch)} papers (total: {inserted_count}/{len(papers)})")
         
         except Exception as e:
             logger.error(f"Batch insert failed: {e}")
-            raise
+            
+            # Try inserting papers one by one to identify problematic paper
+            logger.info(f"Retrying batch papers individually...")
+            
+            for paper in batch:
+                try:
+                    async with pool.acquire() as conn:
+                        await conn.execute(query, 
+                            paper['paper_id'], paper['title'], paper['abstract'],
+                            paper['introduction'], paper['tldr'], paper['authors'],
+                            paper['year'], paper['venue'], paper['citation_count'],
+                            paper['domain'], paper['domain_confidence'], paper['sub_domains'],
+                            paper['reference_ids'], paper['citation_ids'], paper['reference_count'],
+                            paper['quality_score'], paper['extraction_method'], paper['content_quality'],
+                            paper['has_introduction'], paper['intro_length'],
+                            paper['gcs_pdf_path'], paper['ingested_at']
+                        )
+                        inserted_count += 1
+                except Exception as e2:
+                    logger.error(f"Failed to insert paper {paper['paper_id']}: {e2}")
+                    # Skip this paper and continue
     
     return inserted_count
 
@@ -215,6 +270,10 @@ async def batch_insert_embeddings(
     if not embeddings:
         return 0
     
+    if 'specter' in table_name.lower():
+        batch_size = min(batch_size, 50)  # SPECTER embeddings are larger; use smaller batches
+        logger.info("Inserting embeddings into SPECTER table")
+        
     inserted_count = 0
     
     for i in range(0, len(embeddings), batch_size):

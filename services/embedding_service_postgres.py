@@ -304,7 +304,7 @@ class PostgreSQLEmbeddingService:
             try:
                 embeddings = model.encode(
                     texts,
-                    batch_size=len(texts),
+                    batch_size=8,
                     show_progress_bar=False,
                     convert_to_numpy=True
                 )
@@ -388,7 +388,7 @@ class PostgreSQLEmbeddingService:
             try:
                 embeddings = model.encode(
                     texts,
-                    batch_size=len(texts),
+                    batch_size=4,
                     show_progress_bar=False,
                     convert_to_numpy=True
                 )

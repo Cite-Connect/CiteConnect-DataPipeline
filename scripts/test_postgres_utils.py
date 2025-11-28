@@ -148,7 +148,7 @@ async def test_batch_insert():
         pool = PostgreSQLConnectionPool(**db_config)
         await pool.create_pool()
         
-        # Create test papers
+        # Create test papers with NEW SCHEMA fields
         from datetime import datetime
         test_papers = [
             {
@@ -156,17 +156,23 @@ async def test_batch_insert():
                 'title': 'Test Paper 1: Machine Learning for Healthcare',
                 'abstract': 'This is a test abstract about machine learning applications in healthcare.',
                 'introduction': 'Introduction text for test paper 1. This discusses ML methods.',
-                'summary': 'Test summary 1',
+                'tldr': 'Test TLDR summary 1',  # NEW: renamed from 'summary'
                 'authors': ['Test Author 1', 'Test Author 2'],
                 'year': 2024,
                 'venue': 'Test Conference 2024',
                 'citation_count': 10,
                 'domain': 'healthcare',
-                'gcs_pdf_path': 'gs://test-bucket/test001.pdf',
+                'domain_confidence': 0.85,  # NEW
+                'sub_domains': ['machine_learning', 'healthcare'],  # NEW
+                'reference_ids': [],  # NEW: empty for now
+                'citation_ids': [],  # NEW: empty for now
+                'reference_count': 15,  # NEW
+                'quality_score': 0.8,  # NEW
                 'extraction_method': 'arxiv_html',
                 'content_quality': 'high',
                 'has_introduction': True,
                 'intro_length': 250,
+                'gcs_pdf_path': 'gs://test-bucket/test001.pdf',
                 'ingested_at': datetime.utcnow()
             },
             {
@@ -174,17 +180,23 @@ async def test_batch_insert():
                 'title': 'Test Paper 2: Deep Learning for Finance',
                 'abstract': 'This is a test abstract about deep learning in financial markets.',
                 'introduction': 'Introduction for test paper 2 about finance.',
-                'summary': 'Test summary 2',
+                'tldr': 'Test TLDR summary 2',  # NEW
                 'authors': ['Test Author 3'],
                 'year': 2023,
                 'venue': 'Test Journal 2023',
                 'citation_count': 5,
                 'domain': 'fintech',
-                'gcs_pdf_path': 'gs://test-bucket/test002.pdf',
+                'domain_confidence': 0.9,  # NEW
+                'sub_domains': ['finance', 'deep_learning'],  # NEW
+                'reference_ids': [],  # NEW
+                'citation_ids': [],  # NEW
+                'reference_count': 8,  # NEW
+                'quality_score': 0.75,  # NEW
                 'extraction_method': 'grobid_pdf',
                 'content_quality': 'medium',
                 'has_introduction': True,
                 'intro_length': 180,
+                'gcs_pdf_path': 'gs://test-bucket/test002.pdf',
                 'ingested_at': datetime.utcnow()
             }
         ]
