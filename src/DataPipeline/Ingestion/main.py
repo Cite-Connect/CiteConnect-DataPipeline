@@ -5,8 +5,9 @@ import pandas as pd
 import asyncio
 import aiohttp
 from pathlib import Path
+from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .semantic_scholar_client import search_semantic_scholar, search_semantic_scholar_async
+from .semantic_scholar_client import search_semantic_scholar, search_semantic_scholar_async, get_papers_by_ids_batch_async
 from .processor import process_papers
 from .gcs_uploader import upload_to_gcs, upload_to_gcs_async
 from .api_key_manager import APIKeyManager
@@ -16,6 +17,131 @@ GCS_BUCKET = os.getenv('GCS_BUCKET_NAME')
 
 # Initialize API key manager (shared across all collection tasks)
 api_key_manager = APIKeyManager()
+
+
+async def extract_reference_paper_ids_from_api(
+    session: aiohttp.ClientSession,
+    paper_ids: List[str],
+    api_key: Optional[str] = None,
+    max_references_per_paper: int = None
+) -> List[str]:
+    """
+    Extract unique paperIds from references of seed papers using the /references endpoint
+    
+    Args:
+        session: aiohttp ClientSession
+        paper_ids: List of seed paper IDs
+        api_key: Optional API key
+        max_references_per_paper: Limit references per paper (None = all)
+    
+    Returns:
+        List of unique reference paperIds
+    """
+    from .semantic_scholar_client import get_papers_references_batch_async
+    
+    if not paper_ids:
+        return []
+    
+    # Fetch references for all papers in parallel
+    references_dict = await get_papers_references_batch_async(
+        session,
+        paper_ids,
+        api_key=api_key,
+        max_references_per_paper=max_references_per_paper,
+        max_concurrent=10
+    )
+    
+    # Collect all unique reference IDs
+    reference_ids = set()
+    total_refs = 0
+    
+    for paper_id, ref_ids in references_dict.items():
+        total_refs += len(ref_ids)
+        reference_ids.update(ref_ids)
+    
+    unique_ids = list(reference_ids)
+    
+    # Log statistics
+    if max_references_per_paper:
+        logging.info(f"📚 Extracted {len(unique_ids)} unique reference paperIds from {len(paper_ids)} seed papers")
+        logging.info(f"   📊 Limit: {max_references_per_paper} refs/paper → {total_refs} total refs → {len(unique_ids)} unique (after deduplication)")
+        logging.info(f"   💡 Note: Multiple seed papers may reference the same paper, so unique count is lower")
+    else:
+        logging.info(f"📚 Extracted {len(unique_ids)} unique reference paperIds from {len(paper_ids)} seed papers")
+        logging.info(f"   📊 {total_refs} total refs → {len(unique_ids)} unique (after deduplication)")
+    
+    return unique_ids
+
+
+async def collect_referenced_papers(
+    session: aiohttp.ClientSession,
+    seed_paper_ids: List[str],
+    api_key: Optional[str] = None,
+    max_references_per_paper: int = None,
+    max_concurrent_fetches: int = 10
+) -> List[Dict]:
+    """
+    Collect all papers referenced by seed papers using the /references endpoint
+    
+    Args:
+        session: aiohttp ClientSession
+        seed_paper_ids: List of seed paper IDs
+        api_key: Optional API key (will rotate if multiple keys available)
+        max_references_per_paper: Max references to collect per seed paper
+        max_concurrent_fetches: Max concurrent API calls
+    
+    Returns:
+        List of referenced papers
+    """
+    from .api_key_manager import APIKeyManager
+    from .semantic_scholar_client import get_papers_by_ids_batch_async
+    
+    # Extract unique reference paperIds using the /references endpoint
+    reference_ids = await extract_reference_paper_ids_from_api(
+        session,
+        seed_paper_ids,
+        api_key=api_key,
+        max_references_per_paper=max_references_per_paper
+    )
+    
+    if not reference_ids:
+        logging.info("📚 No references found in seed papers")
+        return []
+    
+    # Adaptive concurrency: reduce if only 1 API key available
+    key_manager = APIKeyManager()
+    num_keys = key_manager.get_key_count()
+    
+    # Adjust concurrency based on available keys
+    if num_keys == 1:
+        # Single key: be more conservative (2-3 concurrent requests)
+        adaptive_concurrent = min(3, max_concurrent_fetches)
+        logging.info(f"📚 Fetching {len(reference_ids)} referenced papers...")
+        logging.info(f"   ⚠️  Only 1 API key available - using {adaptive_concurrent} concurrent requests (reduced from {max_concurrent_fetches})")
+        logging.info(f"   💡 This will take longer but avoid rate limits")
+    elif num_keys == 2:
+        # 2 keys: moderate concurrency
+        adaptive_concurrent = min(5, max_concurrent_fetches)
+        logging.info(f"📚 Fetching {len(reference_ids)} referenced papers...")
+        logging.info(f"   Using {adaptive_concurrent} concurrent requests with {num_keys} API keys")
+    else:
+        # 3+ keys: can use higher concurrency
+        adaptive_concurrent = max_concurrent_fetches
+        logging.info(f"📚 Fetching {len(reference_ids)} referenced papers...")
+        logging.info(f"   Using {adaptive_concurrent} concurrent requests with {num_keys} API keys (key rotation enabled)")
+    
+    # Use API key rotation for reference fetching (distribute load across keys)
+    # Fetch referenced papers in parallel with key rotation
+    referenced_papers = await get_papers_by_ids_batch_async(
+        session,
+        reference_ids,
+        api_key=api_key,  # Will rotate if api_key_manager has multiple keys
+        max_concurrent=adaptive_concurrent  # Use adaptive concurrency
+    )
+    
+    logging.info(f"✅ Successfully fetched {len(referenced_papers)}/{len(reference_ids)} referenced papers")
+    
+    return referenced_papers
 
 
 def save_results(data, search_term, output_dir):
@@ -229,6 +355,7 @@ async def collect_and_process_pipeline_async(
     logging.info(f"🚀 Starting async pipeline: {len(search_terms)} terms, {max_concurrent_collections} concurrent collections")
     logging.info(f"📊 Pipeline pattern: Collection and preprocessing will overlap")
     logging.info(f"⚙️ Preprocessing: {len(search_terms)} terms in parallel, {preprocessing_executor_size} total workers")
+    logging.info(f"⏱️  Staggered start: {3}s delay between each search term to avoid rate limits")
     
     # Create dedicated ThreadPoolExecutor for preprocessing multiple search terms
     preprocessing_executor = ThreadPoolExecutor(max_workers=preprocessing_executor_size)
@@ -242,8 +369,14 @@ async def collect_and_process_pipeline_async(
             # Semaphore to limit concurrent collections
             collection_semaphore = asyncio.Semaphore(max_concurrent_collections)
             
-            async def collect_term(term, api_key):
-                """Collect papers for a single term"""
+            # Add staggered start to avoid overwhelming API
+            async def collect_term(term, api_key, delay=0):
+                """Collect papers for a single term, including references"""
+                # Stagger requests to avoid rate limits
+                if delay > 0:
+                    logging.info(f"[{term}] ⏳ Waiting {delay}s before starting (staggered start)...")
+                    await asyncio.sleep(delay)
+                
                 async with collection_semaphore:
                     try:
                         key_display = api_key[:8] + "..." if api_key and len(api_key) > 8 else ("none" if not api_key else api_key)
@@ -254,10 +387,10 @@ async def collect_and_process_pipeline_async(
                             logging.warning(f"⚠️  Search term '{term}' is very short. Consider using a more specific term.")
                             logging.warning(f"   Example: 'LLM' → 'Large Language Models' or 'LLMs'")
                         
-                        # Async API call
-                        papers = await search_semantic_scholar_async(session, term, limit, api_key=api_key)
+                        # Async API call for seed papers
+                        seed_papers = await search_semantic_scholar_async(session, term, limit, api_key=api_key)
                         
-                        if not papers:
+                        if not seed_papers:
                             logging.warning(f"[{term}] No results found")
                             logging.warning(f"   💡 Suggestions:")
                             logging.warning(f"      - Try a more specific or longer search term")
@@ -265,26 +398,109 @@ async def collect_and_process_pipeline_async(
                             logging.warning(f"      - For acronyms, try the full term (e.g., 'LLM' → 'Large Language Models')")
                             return None
                         
+                        logging.info(f"[{term}] ✅ Collected {len(seed_papers)} seed papers")
+                        
+                        # Extract paper IDs from seed papers
+                        seed_paper_ids = [p.get("paperId") for p in seed_papers if p.get("paperId")]
+                        
+                        # Collect referenced papers using the /references endpoint
+                        referenced_papers = []
+                        max_refs_per_paper = int(os.getenv('MAX_REFERENCES_PER_PAPER', '0'))  # 0 = collect all, >0 = limit per paper
+                        if max_refs_per_paper == 0:
+                            logging.info(f"[{term}] 📚 Collecting ALL references from {len(seed_paper_ids)} seed papers using /references endpoint...")
+                        else:
+                            logging.info(f"[{term}] 📚 Collecting references (max {max_refs_per_paper} per seed paper) from {len(seed_paper_ids)} seed papers...")
+                        
+                        # Always collect references (0 = all, >0 = limited)
+                        references_dict = {}  # Map paper_id -> list of reference IDs
+                        if seed_paper_ids:
+                            try:
+                                # Get references for each seed paper (to add to metadata)
+                                from .semantic_scholar_client import get_papers_references_batch_async
+                                references_dict = await get_papers_references_batch_async(
+                                    session,
+                                    seed_paper_ids,
+                                    api_key=api_key,
+                                    max_references_per_paper=max_refs_per_paper if max_refs_per_paper > 0 else None,
+                                    max_concurrent=10
+                                )
+                                
+                                # Add references_id to each seed paper
+                                for paper in seed_papers:
+                                    paper_id = paper.get("paperId")
+                                    if paper_id and paper_id in references_dict:
+                                        paper["references_id"] = references_dict[paper_id]
+                                    else:
+                                        paper["references_id"] = []
+                                
+                                # Extract unique reference IDs from all seed papers
+                                all_reference_ids = set()
+                                for ref_ids in references_dict.values():
+                                    all_reference_ids.update(ref_ids)
+                                
+                                # Now collect the actual referenced papers using the unique IDs
+                                if all_reference_ids:
+                                    from .semantic_scholar_client import get_papers_by_ids_batch_async
+                                    from .api_key_manager import APIKeyManager
+                                    
+                                    key_manager = APIKeyManager()
+                                    num_keys = key_manager.get_key_count()
+                                    adaptive_concurrent = min(3, 10) if num_keys == 1 else min(5, 10) if num_keys == 2 else 10
+                                    
+                                    referenced_papers = await get_papers_by_ids_batch_async(
+                                        session,
+                                        list(all_reference_ids),
+                                        api_key=api_key,
+                                        max_concurrent=adaptive_concurrent
+                                    )
+                                    logging.info(f"[{term}] ✅ Collected {len(referenced_papers)}/{len(all_reference_ids)} referenced papers")
+                                else:
+                                    referenced_papers = []
+                                    logging.info(f"[{term}] ✅ No referenced papers to collect")
+                                
+                                # Ensure we have a list (not None)
+                                if referenced_papers is None:
+                                    logging.warning(f"[{term}] ⚠️  collect_referenced_papers returned None, using empty list")
+                                    referenced_papers = []
+                            except Exception as e:
+                                logging.error(f"[{term}] ❌ Error collecting references: {e}")
+                                logging.warning(f"[{term}] ⚠️  Continuing with seed papers only (no references)")
+                                referenced_papers = []
+                                # Still add empty references_id to seed papers
+                                for paper in seed_papers:
+                                    paper["references_id"] = []
+                        else:
+                            logging.warning(f"[{term}] ⚠️  No paperIds found in seed papers, skipping reference collection")
+                            referenced_papers = []
+                            # Add empty references_id to seed papers
+                            for paper in seed_papers:
+                                paper["references_id"] = []
+                        
+                        # Combine seed papers and referenced papers
+                        all_papers = seed_papers + referenced_papers
+                        
                         # Save raw papers locally
                         safe_name = re.sub(r"[^\w\s-]", "", term).replace(" ", "_")
                         local_filename = f"{raw_output_dir}/raw_{safe_name}_{int(time.time())}.parquet"
                         Path(raw_output_dir).mkdir(parents=True, exist_ok=True)
-                        pd.DataFrame(papers).to_parquet(local_filename, index=False)
+                        pd.DataFrame(all_papers).to_parquet(local_filename, index=False)
                         logging.info(f"[{term}] 💾 Saved locally: {local_filename}")
                         
-                        # Async GCS upload
-                        gcs_path = f"raw/{safe_name}_{int(time.time())}.parquet"
+                        # Async GCS upload to raw_v2/ folder
+                        gcs_path = f"raw_v2/{safe_name}_v2_{int(time.time())}.parquet"
                         await upload_to_gcs_async(local_filename, GCS_BUCKET, gcs_path)
                         
                         result = {
                             'search_term': term,
                             'local_file': local_filename,
                             'gcs_path': gcs_path,
-                            'paper_count': len(papers),
-                            'papers': papers  # Keep papers in memory for immediate processing
+                            'paper_count': len(all_papers),
+                            'seed_paper_count': len(seed_papers),
+                            'referenced_paper_count': len(referenced_papers),
+                            'papers': all_papers  # Keep papers in memory for immediate processing
                         }
                         
-                        logging.info(f"[{term}] ✅ Collected {len(papers)} papers")
+                        logging.info(f"[{term}] ✅ Total collected: {len(seed_papers)} seed + {len(referenced_papers)} referenced = {len(all_papers)} papers")
                         return result
                     except Exception as e:
                         logging.error(f"[{term}] ❌ Collection failed: {e}")
@@ -296,10 +512,19 @@ async def collect_and_process_pipeline_async(
                     return None
                 
                 term = collection_result['search_term']
-                papers = collection_result['papers']
+                papers = collection_result.get('papers', [])
+                
+                # Validate papers is a list
+                if not isinstance(papers, list):
+                    logging.error(f"[{term}] ❌ Invalid papers data: expected list, got {type(papers)}")
+                    return None
+                
+                if not papers:
+                    logging.warning(f"[{term}] ⚠️  No papers to process")
+                    return None
                 
                 try:
-                    logging.info(f"[{term}] 🔧 Starting preprocessing...")
+                    logging.info(f"[{term}] 🔧 Starting preprocessing for {len(papers)} papers...")
                     
                     # Run CPU-bound processing in dedicated preprocessing executor
                     # This allows multiple search terms to be processed in parallel
@@ -311,6 +536,15 @@ async def collect_and_process_pipeline_async(
                         term
                     )
                     
+                    # Validate processed result
+                    if processed is None:
+                        logging.error(f"[{term}] ❌ process_papers returned None")
+                        return None
+                    
+                    if not isinstance(processed, list):
+                        logging.error(f"[{term}] ❌ process_papers returned invalid type: {type(processed)}")
+                        return None
+                    
                     # Save processed results locally
                     safe_name = re.sub(r"[^\w\s-]", "", term).replace(" ", "_")
                     processed_filename = f"{processed_output_dir}/processed_{safe_name}_{int(time.time())}.parquet"
@@ -318,8 +552,8 @@ async def collect_and_process_pipeline_async(
                     pd.DataFrame(processed).to_parquet(processed_filename, index=False)
                     logging.info(f"[{term}] 💾 Saved processed locally: {processed_filename}")
                     
-                    # Async GCS upload
-                    processed_gcs_path = f"processed/{safe_name}_processed.parquet"
+                    # Async GCS upload to processed_v2/ folder
+                    processed_gcs_path = f"processed_v2/{safe_name}_v2_processed.parquet"
                     await upload_to_gcs_async(processed_filename, GCS_BUCKET, processed_gcs_path)
                     
                     result = {
@@ -337,11 +571,13 @@ async def collect_and_process_pipeline_async(
                     logging.error(f"[{term}] ❌ Processing failed: {e}")
                     return None
             
-            # Pipeline: Start collecting all terms, process as soon as each completes
+            # Pipeline: Start collecting all terms with staggered delays to avoid rate limits
             collection_tasks = []
-            for term in search_terms:
+            stagger_delay = 3  # 3 seconds between each search term start
+            for i, term in enumerate(search_terms):
                 api_key = api_key_manager.get_key()
-                task = collect_term(term, api_key)
+                delay = i * stagger_delay  # Stagger: 0s, 3s, 6s, etc.
+                task = collect_term(term, api_key, delay=delay)
                 collection_tasks.append(task)
             
             # Process results as they complete (pipeline pattern)
