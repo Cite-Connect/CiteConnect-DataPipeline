@@ -317,6 +317,95 @@ def load_raw_papers(file_path):
     return df.to_dict('records')
 
 
+async def collect_in_batches(
+    search_terms,
+    limit=10,
+    raw_output_dir="data/raw",
+    processed_output_dir="data/processed",
+    batch_size=3,
+    batch_delay=300,
+    max_concurrent_collections=None
+):
+    """
+    Process search terms in batches with delays between batches to avoid rate limits.
+    
+    Args:
+        search_terms: List of search terms to process
+        limit: Papers per term
+        raw_output_dir: Directory for raw data
+        processed_output_dir: Directory for processed data
+        batch_size: Number of terms per batch (default: 3 for 3 API keys)
+        batch_delay: Seconds to wait between batches (default: 300 = 5 minutes)
+        max_concurrent_collections: Max concurrent API calls per batch
+    
+    Returns:
+        Dictionary with both collection and processing results from all batches
+    """
+    from .api_key_manager import APIKeyManager
+    
+    key_manager = APIKeyManager()
+    num_keys = key_manager.get_key_count()
+    
+    # Adjust batch size based on number of API keys
+    if batch_size is None:
+        # Default: 2-3 terms per batch for 2-3 keys, 1 term for single key
+        batch_size = min(3, num_keys) if num_keys > 1 else 1
+    
+    # Adjust delay based on number of API keys (more keys = shorter delay)
+    if batch_delay is None:
+        batch_delay = 300 if num_keys <= 2 else 180  # 5 min for 1-2 keys, 3 min for 3+ keys
+    
+    all_collection_results = []
+    all_processing_results = []
+    
+    total_batches = (len(search_terms) + batch_size - 1) // batch_size  # Ceiling division
+    
+    logging.info(f"📦 Batch Processing: {len(search_terms)} terms in {total_batches} batches")
+    logging.info(f"   Batch size: {batch_size} terms per batch")
+    logging.info(f"   Delay between batches: {batch_delay}s ({batch_delay/60:.1f} minutes)")
+    logging.info(f"   API keys available: {num_keys}")
+    
+    for batch_num in range(total_batches):
+        start_idx = batch_num * batch_size
+        end_idx = min(start_idx + batch_size, len(search_terms))
+        batch = search_terms[start_idx:end_idx]
+        
+        logging.info(f"\n{'='*60}")
+        logging.info(f"📦 Processing Batch {batch_num + 1}/{total_batches}: {batch}")
+        logging.info(f"{'='*60}")
+        
+        # Process this batch
+        batch_results = await collect_and_process_pipeline_async(
+            search_terms=batch,
+            limit=limit,
+            raw_output_dir=raw_output_dir,
+            processed_output_dir=processed_output_dir,
+            max_concurrent_collections=max_concurrent_collections
+        )
+        
+        # Collect results
+        all_collection_results.extend(batch_results.get('collection_results', []))
+        all_processing_results.extend(batch_results.get('processing_results', []))
+        
+        # Wait before next batch (except for the last batch)
+        if batch_num < total_batches - 1:
+            logging.info(f"\n⏳ Waiting {batch_delay}s ({batch_delay/60:.1f} minutes) before next batch (rate limit cooldown)...")
+            logging.info(f"   This allows API rate limits to reset before processing the next batch")
+            await asyncio.sleep(batch_delay)
+            logging.info(f"✅ Cooldown complete. Starting next batch...\n")
+    
+    logging.info(f"\n{'='*60}")
+    logging.info(f"✅ All batches completed!")
+    logging.info(f"   Total collection results: {len(all_collection_results)}")
+    logging.info(f"   Total processing results: {len(all_processing_results)}")
+    logging.info(f"{'='*60}\n")
+    
+    return {
+        'collection_results': all_collection_results,
+        'processing_results': all_processing_results
+    }
+
+
 async def collect_and_process_pipeline_async(
     search_terms,
     limit=10,
@@ -479,6 +568,40 @@ async def collect_and_process_pipeline_async(
                         # Combine seed papers and referenced papers
                         all_papers = seed_papers + referenced_papers
                         
+                        # Deduplicate papers by paperId (keep first occurrence)
+                        seen_paper_ids = set()
+                        unique_papers = []
+                        duplicates_count = 0
+                        for paper in all_papers:
+                            paper_id = paper.get("paperId")
+                            if paper_id:
+                                if paper_id not in seen_paper_ids:
+                                    seen_paper_ids.add(paper_id)
+                                    unique_papers.append(paper)
+                                else:
+                                    duplicates_count += 1
+                            else:
+                                # Keep papers without IDs (shouldn't happen, but safe)
+                                unique_papers.append(paper)
+                        
+                        if duplicates_count > 0:
+                            logging.info(f"[{term}] 🔄 Deduplicated {duplicates_count} duplicate papers (kept {len(unique_papers)} unique papers)")
+                        
+                        all_papers = unique_papers
+                        
+                        # Filter references_id in seed papers to only include papers that are actually in the final dataset
+                        # This ensures references_id only contains papers that exist after deduplication
+                        final_paper_ids = {p.get("paperId") for p in unique_papers if p.get("paperId")}
+                        for paper in unique_papers:
+                            if "references_id" in paper and isinstance(paper.get("references_id"), list):
+                                # Filter references_id to only include papers that exist in final dataset
+                                original_refs = paper["references_id"]
+                                filtered_refs = [ref_id for ref_id in original_refs if ref_id in final_paper_ids]
+                                if len(filtered_refs) != len(original_refs):
+                                    removed_count = len(original_refs) - len(filtered_refs)
+                                    logging.debug(f"[{term}] Filtered {removed_count} reference IDs from paper {paper.get('paperId', 'unknown')} (references not in final dataset)")
+                                paper["references_id"] = filtered_refs
+                        
                         # Save raw papers locally
                         safe_name = re.sub(r"[^\w\s-]", "", term).replace(" ", "_")
                         local_filename = f"{raw_output_dir}/raw_{safe_name}_{int(time.time())}.parquet"
@@ -526,14 +649,25 @@ async def collect_and_process_pipeline_async(
                 try:
                     logging.info(f"[{term}] 🔧 Starting preprocessing for {len(papers)} papers...")
                     
-                    # Run CPU-bound processing in dedicated preprocessing executor
+                    # Run I/O-bound processing in dedicated preprocessing executor
                     # This allows multiple search terms to be processed in parallel
+                    # Processing involves PDF downloads and web scraping (not Semantic Scholar API)
+                    # So we can use more workers without hitting Semantic Scholar rate limits
                     loop = asyncio.get_event_loop()
+                    
+                    # Get max_workers from environment or use smart default
+                    # Higher workers = faster processing (I/O bound, not API rate limited)
+                    # But be respectful to ArXiv and PDF hosting sites
+                    max_workers_env = os.getenv('PROCESSING_MAX_WORKERS')
+                    max_workers = int(max_workers_env) if max_workers_env else 10  # Default: 10 (up from 5)
+                    
                     processed = await loop.run_in_executor(
                         preprocessing_executor,  # Use dedicated executor instead of None
                         process_papers,
                         papers,
-                        term
+                        term,
+                        False,  # debug flag
+                        max_workers  # Pass max_workers to process_papers
                     )
                     
                     # Validate processed result
@@ -544,6 +678,27 @@ async def collect_and_process_pipeline_async(
                     if not isinstance(processed, list):
                         logging.error(f"[{term}] ❌ process_papers returned invalid type: {type(processed)}")
                         return None
+                    
+                    # Deduplicate processed papers by paperId (should already be deduplicated, but extra safety)
+                    seen_processed_ids = set()
+                    unique_processed = []
+                    processed_duplicates = 0
+                    for paper in processed:
+                        paper_id = paper.get("paperId")
+                        if paper_id:
+                            if paper_id not in seen_processed_ids:
+                                seen_processed_ids.add(paper_id)
+                                unique_processed.append(paper)
+                            else:
+                                processed_duplicates += 1
+                        else:
+                            # Keep papers without IDs
+                            unique_processed.append(paper)
+                    
+                    if processed_duplicates > 0:
+                        logging.warning(f"[{term}] ⚠️  Found {processed_duplicates} duplicate papers in processed data (removed)")
+                    
+                    processed = unique_processed
                     
                     # Save processed results locally
                     safe_name = re.sub(r"[^\w\s-]", "", term).replace(" ", "_")
@@ -612,10 +767,13 @@ def collect_and_process_pipeline(
     limit=10,
     raw_output_dir="data/raw",
     processed_output_dir="data/processed",
-    use_async=True
+    use_async=True,
+    use_batch_processing=None,
+    batch_size=None,
+    batch_delay=None
 ):
     """
-    Wrapper function that can use async pipeline or fall back to sync
+    Wrapper function that can use async pipeline with optional batch processing
     
     Args:
         search_terms: List of search terms
@@ -623,11 +781,55 @@ def collect_and_process_pipeline(
         raw_output_dir: Directory for raw data
         processed_output_dir: Directory for processed data
         use_async: Whether to use async pipeline (default: True)
+        use_batch_processing: Whether to use batch processing (default: auto-detect based on number of terms)
+        batch_size: Number of terms per batch (default: auto-calculate based on API keys)
+        batch_delay: Seconds to wait between batches (default: 300 = 5 minutes)
     
     Returns:
         Dictionary with both collection and processing results
     """
     if use_async:
+        # Auto-enable batch processing if many terms (more than 5) or if explicitly enabled via env
+        if use_batch_processing is None:
+            # Check environment variable first
+            batch_env = os.getenv('USE_BATCH_PROCESSING', '').lower()
+            if batch_env in ('true', '1', 'yes'):
+                use_batch_processing = True
+            elif batch_env in ('false', '0', 'no'):
+                use_batch_processing = False
+            else:
+                # Auto-detect: enable if more than 5 terms
+                use_batch_processing = len(search_terms) > 5
+        
+        # Get batch configuration from environment if not provided
+        if batch_size is None:
+            batch_size_env = os.getenv('BATCH_SIZE')
+            batch_size = int(batch_size_env) if batch_size_env else None
+        
+        if batch_delay is None:
+            batch_delay_env = os.getenv('BATCH_DELAY')
+            batch_delay = int(batch_delay_env) if batch_delay_env else None
+        
+        if use_batch_processing:
+            # Use batch processing to avoid rate limits
+            import asyncio
+            return asyncio.run(collect_in_batches(
+                search_terms=search_terms,
+                limit=limit,
+                raw_output_dir=raw_output_dir,
+                processed_output_dir=processed_output_dir,
+                batch_size=batch_size,
+                batch_delay=batch_delay
+            ))
+        else:
+            # Run async pipeline without batching
+            import asyncio
+            return asyncio.run(collect_and_process_pipeline_async(
+                search_terms,
+                limit,
+                raw_output_dir,
+                processed_output_dir
+            ))
         # Run async pipeline
         return asyncio.run(collect_and_process_pipeline_async(
             search_terms,
