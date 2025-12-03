@@ -4,6 +4,8 @@ x-airflow-common:
   &airflow-common
   # Build our custom image
   build: .
+  env_file:
+    - .env
   environment:
     &airflow-common-env
     # Airflow configuration

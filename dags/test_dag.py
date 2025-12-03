@@ -23,14 +23,19 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
-# DAG config
+# DAG config with params for runtime configuration
 dag = DAG(
     'test_citeconnect',
     default_args=default_args,
     description='CiteConnect test pipeline with email notifications',
     schedule_interval=None,
     catchup=False,
-    tags=['test', 'citeconnect']
+    tags=['test', 'citeconnect'],
+    params={
+        'SEARCH_TERMS': 'computer vision',  # Default search terms
+        'COLLECTION_DOMAIN': 'AI',  # Default domain
+        'COLLECTION_SUBDOMAINS': ''  # Default subdomains (comma-separated)
+    }
 )
 
 def check_env_variables():
@@ -159,72 +164,161 @@ def run_unit_tests():
     except Exception as e:
         return f"ERROR: Error running unit tests: {e}"
 
-def test_paper_collection():
+def test_paper_collection(**context):
     """
     Collect papers using async pipeline with overlapping collection/preprocessing.
     This replaces the old sequential approach with a faster pipeline pattern.
+    
+    Configuration can be passed via:
+    1. DAG params (when triggering from UI)
+    2. JSON config (when triggering with config)
+    3. Environment variables (fallback)
     """
     from src.DataPipeline.Ingestion.main import collect_and_process_pipeline
     import os
+    import json
     
-    # Get search terms from environment variable or use default
-    search_terms_env = os.getenv('SEARCH_TERMS', 'finance, quantum computing, healthcare')
-    search_terms = [term.strip() for term in search_terms_env.split(',')]
-    limit = int(os.getenv('PAPERS_PER_TERM', '5'))
+    # Get config from DAG run params/config (priority) or environment variables (fallback)
+    dag_run = context.get('dag_run')
+    params = {}
     
-    print(f"🔍 Search terms: {search_terms}")
-    print(f"📊 Papers per term: {limit}")
-    print(f"🚀 Using async pipeline with overlapping collection/preprocessing")
+    if dag_run and dag_run.conf:
+        # Config passed as JSON when triggering
+        params = dag_run.conf
+        print(f"📋 Using config from DAG run JSON config: {json.dumps(params, indent=2)}")
+    elif dag_run and dag_run.conf is None and hasattr(dag_run, 'dag') and dag_run.dag.params:
+        # Params from DAG definition (when triggered from UI with params)
+        params = dag_run.dag.params
+        print(f"📋 Using config from DAG params: {json.dumps(params, indent=2)}")
+    else:
+        # Fallback to environment variables
+        params = {
+            'SEARCH_TERMS': os.getenv('SEARCH_TERMS', 'finance, quantum computing, healthcare'),
+            'COLLECTION_DOMAIN': os.getenv('COLLECTION_DOMAIN', 'general'),
+            'COLLECTION_SUBDOMAINS': os.getenv('COLLECTION_SUBDOMAINS', '')
+        }
+        print(f"📋 Using config from environment variables: {json.dumps(params, indent=2)}")
     
-    # Use async pipeline (collection and preprocessing overlap)
-    results = collect_and_process_pipeline(
+    # Extract config values
+    search_terms_str = params.get('SEARCH_TERMS', 'finance, quantum computing, healthcare')
+    search_terms = [term.strip() for term in search_terms_str.split(',') if term.strip()]
+    limit = int(os.getenv('PAPERS_PER_TERM', '100'))  # Still use env for limit
+    
+    collection_domain = params.get('COLLECTION_DOMAIN', 'general')
+    collection_subdomains = params.get('COLLECTION_SUBDOMAINS', '')
+    
+    # Temporarily set environment variables for this run (so pipeline functions can access them)
+    # This allows the pipeline to use these values without passing them through every function
+    original_domain = os.environ.get('COLLECTION_DOMAIN')
+    original_subdomains = os.environ.get('COLLECTION_SUBDOMAINS')
+    original_search_terms = os.environ.get('SEARCH_TERMS')
+    
+    try:
+        os.environ['COLLECTION_DOMAIN'] = collection_domain
+        os.environ['COLLECTION_SUBDOMAINS'] = collection_subdomains
+        os.environ['SEARCH_TERMS'] = search_terms_str  # Set for reference, but we pass directly
+        
+        print(f"🔍 Search terms: {search_terms}")
+        print(f"📊 Papers per term: {limit}")
+        print(f"🏷️  Collection Domain: {collection_domain}")
+        print(f"🏷️  Collection Subdomains: {collection_subdomains}")
+        print(f"🚀 Using async pipeline with overlapping collection/preprocessing")
+    
+        # Use async pipeline (collection and preprocessing overlap)
+        results = collect_and_process_pipeline(
         search_terms=search_terms,
         limit=limit,
-        raw_output_dir="/tmp/test_data/raw",
-        processed_output_dir="/tmp/test_data/processed",
-        use_async=True  # Use async pipeline
-    )
+            raw_output_dir="/tmp/test_data/raw",
+            processed_output_dir="/tmp/test_data/processed",
+            use_async=True  # Use async pipeline
+        )
+        
+        collection_results = results['collection_results']
+        processing_results = results['processing_results']
+        
+        print(f"\n✅ Collection completed: {len(collection_results)} terms processed")
+        print("📤 Raw files uploaded to GCS:")
+        for result in collection_results:
+            print(f"  {result['search_term']}: {result['gcs_path']}")
     
-    collection_results = results['collection_results']
-    processing_results = results['processing_results']
-    
-    print(f"\n✅ Collection completed: {len(collection_results)} terms processed")
-    print("📤 Raw files uploaded to GCS:")
-    for result in collection_results:
-        print(f"  {result['search_term']}: {result['gcs_path']}")
-    
-    print(f"\n✅ Preprocessing completed: {len(processing_results)} terms processed")
-    print("📤 Processed files uploaded to GCS:")
-    for result in processing_results:
-        print(f"  {result['search_term']}: {result['processed_gcs']}")
-    
-    # Return collection results for backward compatibility with preprocess_papers task
-    return collection_results
+        print(f"\n✅ Preprocessing completed: {len(processing_results)} terms processed")
+        print("📤 Processed files uploaded to GCS:")
+        for result in processing_results:
+            print(f"  {result['search_term']}: {result['processed_gcs']}")
+        
+        # Return collection results for backward compatibility with preprocess_papers task
+        # Also include config in return for downstream tasks
+        return {
+            'collection_results': collection_results,
+            'config': {
+                'SEARCH_TERMS': search_terms_str,
+                'COLLECTION_DOMAIN': collection_domain,
+                'COLLECTION_SUBDOMAINS': collection_subdomains
+            }
+        }
+    finally:
+        # Restore original environment variables
+        if original_domain is not None:
+            os.environ['COLLECTION_DOMAIN'] = original_domain
+        elif 'COLLECTION_DOMAIN' in os.environ:
+            del os.environ['COLLECTION_DOMAIN']
+            
+        if original_subdomains is not None:
+            os.environ['COLLECTION_SUBDOMAINS'] = original_subdomains
+        elif 'COLLECTION_SUBDOMAINS' in os.environ:
+            del os.environ['COLLECTION_SUBDOMAINS']
+            
+        if original_search_terms is not None:
+            os.environ['SEARCH_TERMS'] = original_search_terms
+        elif 'SEARCH_TERMS' in os.environ:
+            del os.environ['SEARCH_TERMS']
 
 def preprocess_papers(**context):
     """
     Preprocess papers. Note: If using async pipeline, preprocessing is already done
     during collection. This task will skip if preprocessing was already completed.
     """
+    import os  # Import at the top to avoid UnboundLocalError
     print("Testing paper preprocessing...")
 
     ti = context['task_instance']
-    collection_results = ti.xcom_pull(task_ids='test_paper_collection')
+    collection_data = ti.xcom_pull(task_ids='test_paper_collection')
+    
+    # Handle both old format (list) and new format (dict with collection_results)
+    if isinstance(collection_data, dict) and 'collection_results' in collection_data:
+        collection_results = collection_data.get('collection_results', [])
+        config = collection_data.get('config', {})
+        # Set env vars from config for this task
+        if config:
+            os.environ['COLLECTION_DOMAIN'] = config.get('COLLECTION_DOMAIN', os.getenv('COLLECTION_DOMAIN', 'general'))
+            os.environ['COLLECTION_SUBDOMAINS'] = config.get('COLLECTION_SUBDOMAINS', os.getenv('COLLECTION_SUBDOMAINS', ''))
+    elif isinstance(collection_data, list):
+        # Old format: collection_data is a list directly
+        collection_results = collection_data
+    else:
+        collection_results = []
     
     if not collection_results:
         raise ValueError("No collection results received")
     
     # Check if preprocessing was already done (async pipeline does both)
     # If papers were already processed, we can skip this step
-    import os
     processed_dir = "/tmp/test_data/processed"
     if os.path.exists(processed_dir) and os.listdir(processed_dir):
         print("✅ Preprocessing already completed by async pipeline. Skipping...")
-        # Return a placeholder result
-        return [{'search_term': r['search_term'], 'status': 'already_processed'} for r in collection_results]
+        # Return a placeholder result - ensure collection_results is a list of dicts
+        if collection_results and isinstance(collection_results, list):
+            return [{'search_term': r.get('search_term', 'unknown'), 'status': 'already_processed'} for r in collection_results if isinstance(r, dict)]
+        else:
+            # Fallback if format is unexpected
+            return [{'status': 'already_processed', 'note': 'Preprocessing completed by async pipeline'}]
     
     # Fallback: Process if not already done
     from src.DataPipeline.Ingestion.main import process_collected_papers
+    
+    # Ensure collection_results is a list of dicts
+    if not isinstance(collection_results, list):
+        raise ValueError(f"Expected collection_results to be a list, got {type(collection_results)}")
     
     results = process_collected_papers(
         collection_results=collection_results,
@@ -760,6 +854,7 @@ collection_test_task = PythonOperator(
     task_id='test_paper_collection',
     python_callable=test_paper_collection,
     trigger_rule='all_success',
+    provide_context=True,  # Enable context to access params/config
     dag=dag
 )
 
