@@ -10,7 +10,7 @@ import subprocess
 
 sys.path.insert(0, '/opt/airflow')
 
-EMAIL_TO = ['aditya811.abhinav@gmail.com']
+EMAIL_TO = ['anushasrini2001@gmail.com']
 
 default_args = {
     'owner': 'citeconnect-team',
@@ -23,17 +23,20 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
-# DAG config
+# DAG config with params for runtime configuration
 dag = DAG(
     'test_citeconnect',
     default_args=default_args,
     description='CiteConnect test pipeline with email notifications',
     schedule_interval=None,
     catchup=False,
-    tags=['test', 'citeconnect']
+    tags=['test', 'citeconnect'],
+    params={
+        'SEARCH_TERMS': 'computer vision',  # Default search terms
+        'COLLECTION_DOMAIN': 'AI',  # Default domain
+        'COLLECTION_SUBDOMAINS': ''  # Default subdomains (comma-separated)
+    }
 )
-
-search_terms = ["large language models"]
 
 def check_env_variables():
     semantic_scholar_key = os.getenv('SEMANTIC_SCHOLAR_API_KEY')
@@ -95,7 +98,7 @@ def run_unit_tests():
     test_dir = os.path.join(project_root, 'tests/unit')
     if not os.path.exists(test_dir):
         print(f"Test directory not found: {test_dir}")
-        return ValueError(f"Test directory not found: {test_dir}")
+        return f"ERROR: Test directory not found: {test_dir}"
     
     test_files = []
     for root, dirs, files in os.walk(test_dir):
@@ -150,54 +153,176 @@ def run_unit_tests():
             return "tests_passed"
         else:
             print(f"Unit tests failed with return code: {result.returncode}")
-            return ValueError(f"Unit tests failed. {failed_count} failures, {error_count} errors.")
+            error_msg = f"ERROR: Unit tests failed. {failed_count} failures, {error_count} errors."
+            print(error_msg)
+            return error_msg
             
     except subprocess.TimeoutExpired:
-        return ValueError("Unit tests timed out after 5 minutes")
+        return "ERROR: Unit tests timed out after 5 minutes"
     except FileNotFoundError:
-        return ValueError("pytest not found. Please add pytest to requirements.txt")
+        return "ERROR: pytest not found. Please add pytest to requirements.txt"
     except Exception as e:
-        return ValueError(f"Error running unit tests: {e}")
+        return f"ERROR: Error running unit tests: {e}"
 
-def test_paper_collection():
-    from src.DataPipeline.Ingestion.main import collect_papers_only
+def test_paper_collection(**context):
+    """
+    Collect papers using async pipeline with overlapping collection/preprocessing.
+    This replaces the old sequential approach with a faster pipeline pattern.
+    
+    Configuration can be passed via:
+    1. DAG params (when triggering from UI)
+    2. JSON config (when triggering with config)
+    3. Environment variables (fallback)
+    """
+    from src.DataPipeline.Ingestion.main import collect_and_process_pipeline
     import os
+    import json
     
-    # Get search terms from environment variable or use default
-    search_terms_env = os.getenv('SEARCH_TERMS', 'finance, quantum computing, healthcare')
-    search_terms = [term.strip() for term in search_terms_env.split(',')]
-    limit = int(os.getenv('PAPERS_PER_TERM', '5'))
+    # Get config from DAG run params/config (priority) or environment variables (fallback)
+    dag_run = context.get('dag_run')
+    params = {}
     
-    print(f"🔍 Search terms: {search_terms}")
-    print(f"📊 Papers per term: {limit}")
+    if dag_run and dag_run.conf:
+        # Config passed as JSON when triggering
+        params = dag_run.conf
+        print(f"📋 Using config from DAG run JSON config: {json.dumps(params, indent=2)}")
+    elif dag_run and dag_run.conf is None and hasattr(dag_run, 'dag') and dag_run.dag.params:
+        # Params from DAG definition (when triggered from UI with params)
+        params = dag_run.dag.params
+        print(f"📋 Using config from DAG params: {json.dumps(params, indent=2)}")
+    else:
+        # Fallback to environment variables
+        params = {
+            'SEARCH_TERMS': os.getenv('SEARCH_TERMS', 'finance, quantum computing, healthcare'),
+            'COLLECTION_DOMAIN': os.getenv('COLLECTION_DOMAIN', 'general'),
+            'COLLECTION_SUBDOMAINS': os.getenv('COLLECTION_SUBDOMAINS', '')
+        }
+        print(f"📋 Using config from environment variables: {json.dumps(params, indent=2)}")
     
-    results = collect_papers_only(
+    # Extract config values
+    search_terms_str = params.get('SEARCH_TERMS', 'finance, quantum computing, healthcare')
+    search_terms = [term.strip() for term in search_terms_str.split(',') if term.strip()]
+    limit = int(os.getenv('PAPERS_PER_TERM', '100'))  # Still use env for limit
+    
+    collection_domain = params.get('COLLECTION_DOMAIN', 'general')
+    collection_subdomains = params.get('COLLECTION_SUBDOMAINS', '')
+    
+    # Temporarily set environment variables for this run (so pipeline functions can access them)
+    # This allows the pipeline to use these values without passing them through every function
+    original_domain = os.environ.get('COLLECTION_DOMAIN')
+    original_subdomains = os.environ.get('COLLECTION_SUBDOMAINS')
+    original_search_terms = os.environ.get('SEARCH_TERMS')
+    
+    try:
+        os.environ['COLLECTION_DOMAIN'] = collection_domain
+        os.environ['COLLECTION_SUBDOMAINS'] = collection_subdomains
+        os.environ['SEARCH_TERMS'] = search_terms_str  # Set for reference, but we pass directly
+        
+        print(f"🔍 Search terms: {search_terms}")
+        print(f"📊 Papers per term: {limit}")
+        print(f"🏷️  Collection Domain: {collection_domain}")
+        print(f"🏷️  Collection Subdomains: {collection_subdomains}")
+        print(f"🚀 Using async pipeline with overlapping collection/preprocessing")
+    
+        # Use async pipeline (collection and preprocessing overlap)
+        results = collect_and_process_pipeline(
         search_terms=search_terms,
         limit=limit,
-        output_dir="/tmp/test_data/raw"
-    )
+            raw_output_dir="/tmp/test_data/raw",
+            processed_output_dir="/tmp/test_data/processed",
+            use_async=True  # Use async pipeline
+        )
+        
+        collection_results = results['collection_results']
+        processing_results = results['processing_results']
+        
+        print(f"\n✅ Collection completed: {len(collection_results)} terms processed")
+        print("📤 Raw files uploaded to GCS:")
+        for result in collection_results:
+            print(f"  {result['search_term']}: {result['gcs_path']}")
     
-    print(f"Collection completed: {len(results)} terms processed")
-    print("Files uploaded to GCS:")
-    for result in results:
-        print(f"  {result['search_term']}: {result['gcs_path']}")
-    
-    return results
+        print(f"\n✅ Preprocessing completed: {len(processing_results)} terms processed")
+        print("📤 Processed files uploaded to GCS:")
+        for result in processing_results:
+            print(f"  {result['search_term']}: {result['processed_gcs']}")
+        
+        # Return collection results for backward compatibility with preprocess_papers task
+        # Also include config in return for downstream tasks
+        return {
+            'collection_results': collection_results,
+            'config': {
+                'SEARCH_TERMS': search_terms_str,
+                'COLLECTION_DOMAIN': collection_domain,
+                'COLLECTION_SUBDOMAINS': collection_subdomains
+            }
+        }
+    finally:
+        # Restore original environment variables
+        if original_domain is not None:
+            os.environ['COLLECTION_DOMAIN'] = original_domain
+        elif 'COLLECTION_DOMAIN' in os.environ:
+            del os.environ['COLLECTION_DOMAIN']
+            
+        if original_subdomains is not None:
+            os.environ['COLLECTION_SUBDOMAINS'] = original_subdomains
+        elif 'COLLECTION_SUBDOMAINS' in os.environ:
+            del os.environ['COLLECTION_SUBDOMAINS']
+            
+        if original_search_terms is not None:
+            os.environ['SEARCH_TERMS'] = original_search_terms
+        elif 'SEARCH_TERMS' in os.environ:
+            del os.environ['SEARCH_TERMS']
 
 def preprocess_papers(**context):
+    """
+    Preprocess papers. Note: If using async pipeline, preprocessing is already done
+    during collection. This task will skip if preprocessing was already completed.
+    """
+    import os  # Import at the top to avoid UnboundLocalError
     print("Testing paper preprocessing...")
 
     ti = context['task_instance']
-    collection_results = ti.xcom_pull(task_ids='test_paper_collection')
+    collection_data = ti.xcom_pull(task_ids='test_paper_collection')
+    
+    # Handle both old format (list) and new format (dict with collection_results)
+    if isinstance(collection_data, dict) and 'collection_results' in collection_data:
+        collection_results = collection_data.get('collection_results', [])
+        config = collection_data.get('config', {})
+        # Set env vars from config for this task
+        if config:
+            os.environ['COLLECTION_DOMAIN'] = config.get('COLLECTION_DOMAIN', os.getenv('COLLECTION_DOMAIN', 'general'))
+            os.environ['COLLECTION_SUBDOMAINS'] = config.get('COLLECTION_SUBDOMAINS', os.getenv('COLLECTION_SUBDOMAINS', ''))
+    elif isinstance(collection_data, list):
+        # Old format: collection_data is a list directly
+        collection_results = collection_data
+    else:
+        collection_results = []
     
     if not collection_results:
         raise ValueError("No collection results received")
     
+    # Check if preprocessing was already done (async pipeline does both)
+    # If papers were already processed, we can skip this step
+    processed_dir = "/tmp/test_data/processed"
+    if os.path.exists(processed_dir) and os.listdir(processed_dir):
+        print("✅ Preprocessing already completed by async pipeline. Skipping...")
+        # Return a placeholder result - ensure collection_results is a list of dicts
+        if collection_results and isinstance(collection_results, list):
+            return [{'search_term': r.get('search_term', 'unknown'), 'status': 'already_processed'} for r in collection_results if isinstance(r, dict)]
+        else:
+            # Fallback if format is unexpected
+            return [{'status': 'already_processed', 'note': 'Preprocessing completed by async pipeline'}]
+    
+    # Fallback: Process if not already done
     from src.DataPipeline.Ingestion.main import process_collected_papers
+    
+    # Ensure collection_results is a list of dicts
+    if not isinstance(collection_results, list):
+        raise ValueError(f"Expected collection_results to be a list, got {type(collection_results)}")
     
     results = process_collected_papers(
         collection_results=collection_results,
-        output_dir="/tmp/test_data/processed"
+        output_dir=processed_dir
     )
     
     print(f"Processing completed: {len(results)} terms processed")
@@ -350,13 +475,29 @@ def check_bias_and_send_alert():
         <b>Disparity Difference:</b> {disparity_diff:.2f}</p>
         <p>Check the detailed slice report in databias/slices/fairness_disparity.json</p>
         """
-        send_email(
-            to=EMAIL_TO,
-            subject=subject,
-            html_content=html_content
-        )
-        print(f"🚨 Bias alert email sent! Ratio exceeded threshold {THRESHOLD}.")
-        return "alert_sent"
+        try:
+            # Check if SMTP credentials are configured
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_pass = os.getenv('SMTP_PASSWORD')
+            
+            if smtp_user and smtp_pass:
+                send_email(
+                    to=EMAIL_TO,
+                    subject=subject,
+                    html_content=html_content
+                )
+                print(f"🚨 Bias alert email sent! Ratio exceeded threshold {THRESHOLD}.")
+                return "alert_sent"
+            else:
+                print(f"⚠️ SMTP credentials not configured. Skipping email alert.")
+                print(f"🚨 Bias threshold exceeded (ratio: {disparity_ratio:.2f} > {THRESHOLD})")
+                print(f"   To enable email alerts, set SMTP_USER and SMTP_PASSWORD in .env file")
+                return "alert_threshold_exceeded_no_email"
+        except Exception as e:
+            print(f"⚠️ Failed to send email alert: {e}")
+            print(f"🚨 Bias threshold exceeded (ratio: {disparity_ratio:.2f} > {THRESHOLD})")
+            print(f"   Task will continue despite email failure")
+            return "alert_threshold_exceeded_email_failed"
     else:
         print("✅ Bias within acceptable limits. No alert sent.")
         return "no_alert"
@@ -469,6 +610,10 @@ def version_embeddings_with_dvc(**context):
         total_papers = embed_results.get('total_papers', 0)
         run_params = embed_results.get('params', {"status": "unknown"})
         
+        # Get search terms from environment variable (same as test_paper_collection)
+        search_terms_env = os.getenv('SEARCH_TERMS', 'finance, quantum computing, healthcare')
+        search_terms_list = [term.strip() for term in search_terms_env.split(',')]
+        
         summary_list = []
         if os.path.exists(summary_path):
             try:
@@ -489,7 +634,7 @@ def version_embeddings_with_dvc(**context):
                     "total_chunks": embeddings_created
                 },
                 "total_papers_processed": total_papers,
-                "search_terms": search_terms
+                "search_terms": search_terms_list
             }
         }
         
@@ -709,6 +854,7 @@ collection_test_task = PythonOperator(
     task_id='test_paper_collection',
     python_callable=test_paper_collection,
     trigger_rule='all_success',
+    provide_context=True,  # Enable context to access params/config
     dag=dag
 )
 

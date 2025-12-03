@@ -18,16 +18,16 @@ client = storage.Client()
 bucket = client.bucket(BUCKET_NAME)
 blob = bucket.blob(SAMPLE_PATH)
 
-print(f"📦 Downloading {SAMPLE_PATH} from {BUCKET_NAME}...")
+print(f" Downloading {SAMPLE_PATH} from {BUCKET_NAME}...")
 data = blob.download_as_bytes()
 
 df = pd.read_parquet(BytesIO(data))
-print(f"✅ Loaded {len(df)} records and {len(df.columns)} columns.\n")
+print(f"Loaded {len(df)} records and {len(df.columns)} columns.\n")
 
 # --- Step 4: Show schema and sample ---
-print("📋 Columns available:\n", df.columns.tolist(), "\n")
-print("🔍 Sample rows:\n", df.head(3), "\n")
+print(" Columns available:\n", df.columns.tolist(), "\n")
+print(" Sample rows:\n", df.head(3), "\n")
 
 # --- Step 5: Describe numeric & categorical fields ---
-print("📊 Numeric overview:\n", df.describe(include='number'), "\n")
-print("🧮 Categorical overview:\n", df.describe(include='object'), "\n")
+print(" Numeric overview:\n", df.describe(include='number'), "\n")
+print(" Categorical overview:\n", df.describe(include='object'), "\n")

@@ -26,8 +26,8 @@ FOLDER = "raw/"
 client = storage.Client()
 bucket = client.bucket(BUCKET_NAME)
 
-print(f"✅ Connected to project: {client.project}")
-print(f"📦 Using bucket: {BUCKET_NAME}/{FOLDER}")
+print(f"Connected to project: {client.project}")
+print(f"Using bucket: {BUCKET_NAME}/{FOLDER}")
 
 # ============================================================
 # 3. List all parquet files
@@ -35,25 +35,25 @@ print(f"📦 Using bucket: {BUCKET_NAME}/{FOLDER}")
 blobs = list(bucket.list_blobs(prefix=FOLDER))
 parquet_files = [b for b in blobs if b.name.endswith(".parquet")]
 
-print(f"📁 Found {len(parquet_files)} parquet files in {FOLDER}\n")
+print(f"Found {len(parquet_files)} parquet files in {FOLDER}\n")
 
 # ============================================================
 # 4. Load & Combine all parquet files
 # ============================================================
 dfs = []
 for b in parquet_files:
-    print(f"⬇️ Loading {b.name} ...")
+    print(f"Loading {b.name} ...")
     try:
         data = b.download_as_bytes()
         temp_df = pd.read_parquet(BytesIO(data))
         temp_df["source_file"] = b.name
         dfs.append(temp_df)
     except Exception as e:
-        print(f"⚠️ Failed to load {b.name}: {e}")
+        print(f"Failed to load {b.name}: {e}")
 
 # Merge all
 df_all = pd.concat(dfs, ignore_index=True)
-print(f"\n✅ Combined {len(df_all)} rows from {len(dfs)} files")
+print(f"\nCombined {len(df_all)} rows from {len(dfs)} files")
 
 # ============================================================
 # 5. Clean up any dict/list/ndarray columns before saving
@@ -78,12 +78,12 @@ os.makedirs("data", exist_ok=True)
 save_path = "data/combined_gcs_data.parquet"
 df_all.to_parquet(save_path, index=False)
 
-print(f"💾 Saved merged file → {save_path}")
+print(f"Saved merged file → {save_path}")
 
 # ============================================================
 # 7. Display summary
 # ============================================================
-print("\n🧾 Columns:", df_all.columns.tolist())
-print("\n📊 Data Sample:")
+print("\nColumns:", df_all.columns.tolist())
+print("\nData Sample:")
 print(df_all.head(5))
-print("\n✅ Ready for bias analysis → Run: python databias/analyze_bias.py")
+print("\nReady for bias analysis → Run: python databias/analyze_bias.py")

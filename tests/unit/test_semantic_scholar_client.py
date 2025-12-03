@@ -235,8 +235,9 @@ class TestSearchSemanticScholar:
 
     @patch('src.DataPipeline.Ingestion.semantic_scholar_client.requests.get')
     @patch('src.DataPipeline.Ingestion.semantic_scholar_client.time.sleep')
+    @patch('src.DataPipeline.Ingestion.semantic_scholar_client.HEADERS', {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'})
     def test_sleep_duration_between_retries(self, mock_sleep, mock_get):
-        """Test that sleep duration is correct between retries."""
+        """Test that sleep duration is correct between retries (no API key in HEADERS)."""
         # Arrange
         mock_get.side_effect = [
             Mock(status_code=500),
@@ -244,15 +245,54 @@ class TestSearchSemanticScholar:
             Mock(status_code=200, json=lambda: {'data': []})
         ]
 
-        # Act
+        # Act - No API key provided and HEADERS has no API key
         search_semantic_scholar("test query", retries=3)
 
         # Assert
         # Should sleep after first two failures
         assert mock_sleep.call_count == 2
-        # Verify sleep duration is 3 seconds
+        # Verify sleep duration is 5.0 seconds (no API key)
         for call in mock_sleep.call_args_list:
-            assert call[0][0] == 3
+            assert call[0][0] == 5.0
+
+    @patch('src.DataPipeline.Ingestion.semantic_scholar_client.requests.get')
+    @patch('src.DataPipeline.Ingestion.semantic_scholar_client.time.sleep')
+    @patch('src.DataPipeline.Ingestion.semantic_scholar_client.HEADERS', {
+        'User-Agent': 'Mozilla/5.0', 
+        'Accept': 'application/json',
+        'x-api-key': 'test_key_12345'
+    })
+    def test_sleep_duration_with_api_key_in_headers(self, mock_sleep, mock_get):
+        """Test that sleep duration is 1.5s when API key is in HEADERS."""
+        # Arrange
+        mock_get.side_effect = [
+            Mock(status_code=500),
+            Mock(status_code=200, json=lambda: {'data': []})
+        ]
+
+        # Act - No api_key parameter, but HEADERS has API key
+        search_semantic_scholar("test query", retries=2)
+
+        # Assert
+        assert mock_sleep.call_count == 1
+        assert mock_sleep.call_args[0][0] == 1.5
+
+    @patch('src.DataPipeline.Ingestion.semantic_scholar_client.requests.get')
+    @patch('src.DataPipeline.Ingestion.semantic_scholar_client.time.sleep')
+    def test_sleep_duration_with_explicit_api_key(self, mock_sleep, mock_get):
+        """Test that sleep duration is 1.5s when API key is passed explicitly."""
+        # Arrange
+        mock_get.side_effect = [
+            Mock(status_code=500),
+            Mock(status_code=200, json=lambda: {'data': []})
+        ]
+
+        # Act - Explicit API key parameter
+        search_semantic_scholar("test query", retries=2, api_key="explicit_key")
+
+        # Assert
+        assert mock_sleep.call_count == 1
+        assert mock_sleep.call_args[0][0] == 1.5
 
     # ========================================================================
     # HTTP STATUS CODE TESTS

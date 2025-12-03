@@ -1,5 +1,7 @@
 import json
+import os
 from datetime import datetime
+from typing import List
 
 def extract_metadata(paper, search_term):
     """Build structured metadata dictionary for each paper."""
@@ -11,10 +13,69 @@ def extract_metadata(paper, search_term):
                 return default
         return data
     
-    fields_of_study = paper.get("fieldsOfStudy", [])
+    fields_of_study = paper.get("fieldsOfStudy") or []
     if hasattr(fields_of_study, 'tolist'):  # Check if it's a NumPy array
         fields_of_study = fields_of_study.tolist()
+    elif not isinstance(fields_of_study, list):
+        fields_of_study = []
+    
+    # Extract references as TEXT[] array (paper IDs only) - PostgreSQL compatible
+    references = []
+    refs_data = paper.get("references") or []  # Handle None values
+    if isinstance(refs_data, list):
+        for ref in refs_data:
+            if isinstance(ref, dict) and ref.get("paperId"):
+                references.append(ref["paperId"])
+            elif isinstance(ref, str):
+                references.append(ref)
+    
+    # Extract citations as TEXT[] array (paper IDs only) - PostgreSQL compatible
+    citations = []
+    cites_data = paper.get("citations") or []  # Handle None values
+    if isinstance(cites_data, list):
+        for cit in cites_data:
+            if isinstance(cit, dict) and cit.get("paperId"):
+                citations.append(cit["paperId"])
+            elif isinstance(cit, str):
+                citations.append(cit)
+    
+    # Get domain from environment (use directly, no mapping)
+    domain = os.getenv('COLLECTION_DOMAIN', 'general')
+    
+    # Get subdomains from environment and match with search term
+    sub_domains = []
+    subdomains_env = os.getenv('COLLECTION_SUBDOMAINS', '')
+    
+    if subdomains_env:
+        subdomain_list = [s.strip() for s in subdomains_env.split(',')]
+        normalized_term = search_term.lower().strip()
+        
+        # Find matching subdomains
+        for subdomain in subdomain_list:
+            subdomain_lower = subdomain.lower().strip()
+            # Check if search term matches subdomain (either contains or is contained)
+            if subdomain_lower in normalized_term or normalized_term in subdomain_lower:
+                sub_domains.append(subdomain.strip())
+        
+        # If no match found, add the search term itself as a subdomain
+        if not sub_domains:
+            sub_domains.append(search_term.strip())
+    else:
+        # No subdomains configured, use search term
+        sub_domains = [search_term.strip()]
+    
+    # Calculate confidence (1.0 if domain is set, 0.5 if default)
+    domain_confidence = 1.0 if domain != 'general' else 0.5
+    
+    # Handle authors safely (can be None or not a list)
+    authors_data = paper.get("authors") or []
+    authors_str = ", ".join(a.get("name", "") for a in authors_data) if isinstance(authors_data, list) else ""
 
+    # Get references_id if it was added to the paper (for seed papers)
+    references_id = paper.get("references_id", [])
+    if not isinstance(references_id, list):
+        references_id = []
+    
     return {
         "search_term": search_term,
         "paperId": paper.get("paperId"),
@@ -23,10 +84,16 @@ def extract_metadata(paper, search_term):
         "abstract": paper.get("abstract"),
         "year": paper.get("year"),
         "publicationDate": paper.get("publicationDate"),
-        "authors": ", ".join(a.get("name", "") for a in (paper.get("authors", []) if isinstance(paper.get("authors"), list) else [])),
+        "authors": authors_str,
         "citationCount": paper.get("citationCount", 0),
-        "referenceCount": paper.get("referenceCount", 0),
+        "referenceCount": len(references),  # Use actual count from extracted refs
+        "references": references,  # TEXT[] array for PostgreSQL
+        "references_id": references_id,  # Paper IDs of references in seed paper (from /references endpoint)
+        "citations": citations,    # TEXT[] array for PostgreSQL
         "fieldsOfStudy": json.dumps(fields_of_study),
+        "domain": domain,  # ✅ Primary domain from COLLECTION_DOMAIN
+        "sub_domains": sub_domains,  # ✅ Sub-domains array (matched from COLLECTION_SUBDOMAINS)
+        "domain_confidence": domain_confidence,  # ✅ Confidence score
         "pdf_url": safe_get(paper, "openAccessPdf", "url"),
         "tldr": safe_get(paper, "tldr", "text"),
         "introduction": None,

@@ -74,6 +74,7 @@ dvc[gs]==3.32.0
 
 # PostgreSQL (for future metadata store)
 # psycopg2-binary>=2.9.0
+asyncpg>=0.29.0  # Async PostgreSQL driver for CiteConnect DAG
 
 # ------------------------------
 # CiteConnect Data Bias Analysis

@@ -23,14 +23,50 @@ from utils.storage_helpers import upload_to_gcs
 # 1. Load data
 # ======================================================
 df = pd.read_parquet("data/combined_gcs_data.parquet")
-print(f"✅ Loaded {len(df)} papers for slicing analysis")
+print(f"Loaded {len(df)} papers for slicing analysis")
 
 # Clean numeric + categorical columns
 df["year"] = pd.to_numeric(df["year"], errors="coerce")
 df["citationCount"] = pd.to_numeric(df["citationCount"], errors="coerce").fillna(0)
-df["intro_length"] = pd.to_numeric(df["intro_length"], errors="coerce").fillna(0)
-df["fieldsOfStudy"] = df["fieldsOfStudy"].astype(str)
-df["content_quality"] = df["content_quality"].astype(str)
+
+# Handle intro_length - create if missing, calculate from introduction if available
+if "intro_length" not in df.columns:
+    if "introduction" in df.columns:
+        df["intro_length"] = df["introduction"].apply(lambda x: len(str(x)) if pd.notna(x) else 0)
+        print("Created intro_length from introduction column")
+    else:
+        df["intro_length"] = 0
+        print("intro_length column not found, setting to 0")
+else:
+    df["intro_length"] = pd.to_numeric(df["intro_length"], errors="coerce").fillna(0)
+
+# Handle fieldsOfStudy - parse JSON if needed
+if "fieldsOfStudy" in df.columns:
+    # If it's a JSON string, parse it; otherwise use as-is
+    if df["fieldsOfStudy"].dtype == 'object':
+        try:
+            # Try to parse JSON strings
+            df["fieldsOfStudy"] = df["fieldsOfStudy"].apply(
+                lambda x: json.loads(x) if isinstance(x, str) and x.startswith('[') else x
+            )
+            # Convert list to string for grouping
+            df["fieldsOfStudy"] = df["fieldsOfStudy"].apply(
+                lambda x: ', '.join(x) if isinstance(x, list) else str(x)
+            )
+        except:
+            df["fieldsOfStudy"] = df["fieldsOfStudy"].astype(str)
+    else:
+        df["fieldsOfStudy"] = df["fieldsOfStudy"].astype(str)
+else:
+    df["fieldsOfStudy"] = "unknown"
+    print("fieldsOfStudy column not found, setting to 'unknown'")
+
+# Handle content_quality
+if "content_quality" in df.columns:
+    df["content_quality"] = df["content_quality"].astype(str)
+else:
+    df["content_quality"] = "unknown"
+    print("content_quality column not found, setting to 'unknown'")
 
 os.makedirs("databias/slices", exist_ok=True)
 
@@ -45,7 +81,7 @@ slices = {
 
 with open("databias/slices/slice_summary.json", "w") as f:
     json.dump(slices, f, indent=2)
-print("📊 Saved slice summaries → databias/slices/slice_summary.json")
+print("Saved slice summaries → databias/slices/slice_summary.json")
 
 # ======================================================
 # 3. Fairlearn MetricFrame – group fairness view
@@ -96,9 +132,9 @@ df_balanced = pd.concat([
     df[~df["fieldsOfStudy"].isin(underrep)]
 ])
 
-print(f"\n⚖️ After mitigation: {len(df_balanced)} samples (was {len(df)})")
+print(f"\nAfter mitigation: {len(df_balanced)} samples (was {len(df)})")
 df_balanced.to_parquet("data/combined_gcs_data_balanced.parquet", index=False)
-print("💾 Saved mitigated dataset → data/combined_gcs_data_balanced.parquet")
+print("Saved mitigated dataset → data/combined_gcs_data_balanced.parquet")
 
 # ======================================================
 # 5. Compute Fairness Disparity Metrics
@@ -118,7 +154,7 @@ bias_report = {
 with open("databias/slices/fairness_disparity.json", "w") as f:
     json.dump(bias_report, f, indent=2)
 
-print("\n📈 Fairness disparity metrics saved → databias/slices/fairness_disparity.json")
+print("\nFairness disparity metrics saved → databias/slices/fairness_disparity.json")
 print(json.dumps(bias_report, indent=2))
 
 # ======================================================
@@ -127,34 +163,34 @@ print(json.dumps(bias_report, indent=2))
 BUCKET_NAME = "citeconnect-test-bucket"
 GCS_PREFIX = "bias_mitigation/"
 
-print("\n📤 Uploading mitigation results to GCS...")
+print("\nUploading mitigation results to GCS...")
 
 # Upload mitigated dataset
 mitigated_dataset = "data/combined_gcs_data_balanced.parquet"
 if os.path.exists(mitigated_dataset):
     dataset_blob_name = f"{GCS_PREFIX}combined_gcs_data_balanced.parquet"
     if upload_to_gcs(mitigated_dataset, BUCKET_NAME, dataset_blob_name):
-        print(f"✅ Uploaded mitigated dataset → gs://{BUCKET_NAME}/{dataset_blob_name}")
+        print(f"Uploaded mitigated dataset → gs://{BUCKET_NAME}/{dataset_blob_name}")
 
 # Upload slice summary JSON
 slice_summary = "databias/slices/slice_summary.json"
 if os.path.exists(slice_summary):
     slice_blob_name = f"{GCS_PREFIX}slice_summary.json"
     if upload_to_gcs(slice_summary, BUCKET_NAME, slice_blob_name):
-        print(f"✅ Uploaded slice summary → gs://{BUCKET_NAME}/{slice_blob_name}")
+        print(f"Uploaded slice summary → gs://{BUCKET_NAME}/{slice_blob_name}")
 
 # Upload fairness disparity JSON
 fairness_file = "databias/slices/fairness_disparity.json"
 if os.path.exists(fairness_file):
     fairness_blob_name = f"{GCS_PREFIX}fairness_disparity.json"
     if upload_to_gcs(fairness_file, BUCKET_NAME, fairness_blob_name):
-        print(f"✅ Uploaded fairness metrics → gs://{BUCKET_NAME}/{fairness_blob_name}")
+        print(f" Uploaded fairness metrics → gs://{BUCKET_NAME}/{fairness_blob_name}")
 
 # Upload field slicing bias plot
 field_plot = "databias/slices/field_slicing_bias.png"
 if os.path.exists(field_plot):
     plot_blob_name = f"{GCS_PREFIX}plots/field_slicing_bias.png"
     if upload_to_gcs(field_plot, BUCKET_NAME, plot_blob_name):
-        print(f"✅ Uploaded field slicing plot → gs://{BUCKET_NAME}/{plot_blob_name}")
+        print(f"Uploaded field slicing plot → gs://{BUCKET_NAME}/{plot_blob_name}")
 
-print("\n✅ Bias mitigation complete! Results uploaded to GCS.")
+print("\n Bias mitigation complete! Results uploaded to GCS.")

@@ -1001,5 +1001,729 @@
                 "large language models"
             ]
         }
+    },
+    {
+        "run_timestamp": "2025-11-23T03:57:13.663148",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 2.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-23T05:04:36.858237",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 2.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-23T05:18:59.799579",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 4.34,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-23T05:19:03.943051",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 4.34,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-23T05:30:10.122795",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 6.6,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-23T05:33:04.775843",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 8.78,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "large language models"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-23T05:55:35.289234",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 12.32,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "computer vision",
+                "transformers",
+                "LLM"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-23T05:59:15.022173",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 14.51,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "computer vision",
+                "transformers",
+                "LLM"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T00:07:54.501530",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 8.5,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing",
+                "computer vision",
+                "transformer architecture"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T00:10:47.901235",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 18.54,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing",
+                "computer vision",
+                "transformer architecture"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T01:32:01.867814",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 2.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T01:32:02.163502",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 2.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T01:32:02.185681",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 2.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T01:32:02.383304",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 2.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T01:37:47.182322",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 4.34,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T02:22:48.464144",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 7.6,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T02:25:06.329080",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 9.52,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T02:57:12.042437",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 11.85,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T03:00:59.659223",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 14.04,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T04:36:17.176451",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 16.22,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "natural language processing"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T05:43:20.172148",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 17.33,
+                "total_chunks": 0
+            },
+            "total_papers_processed": 0,
+            "search_terms": [
+                "computer vision"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T05:57:15.777303",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 2.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "machine_learning"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T06:08:05.812918",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 4.34,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "deep learning",
+                "machine learning"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T17:35:39.457884",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 6.52,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T17:54:03.856928",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 8.71,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T23:27:15.698933",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 10.89,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-28T23:57:47.117677",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 13.07,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-29T18:19:52.073208",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 15.25,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-29T20:19:14.760749",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 17.43,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-29T20:58:32.817308",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 19.62,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-29T22:08:24.135704",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 21.8,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T07:00:45.225304",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 23.98,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T17:03:11.372999",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 26.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T17:39:59.063600",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 28.34,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T17:58:40.452679",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 30.53,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T18:17:58.443793",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 32.71,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T19:02:04.004179",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 34.89,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T19:27:56.851700",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 37.07,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T19:56:37.558866",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 39.25,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T20:41:27.314425",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 0.81,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
+    },
+    {
+        "run_timestamp": "2025-11-30T20:45:45.931940",
+        "params": {
+            "status": "unknown"
+        },
+        "outs": {
+            "embeddings_file": {
+                "path": "working_data/embeddings_db.pkl",
+                "file_size_mb": 2.16,
+                "total_chunks": 744
+            },
+            "total_papers_processed": 1000,
+            "search_terms": [
+                "Generative AI",
+                "Neural Networks"
+            ]
+        }
     }
 ]

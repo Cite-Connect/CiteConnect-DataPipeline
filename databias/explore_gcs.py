@@ -24,15 +24,15 @@ FOLDER = "raw/"
 client = storage.Client()
 bucket = client.bucket(BUCKET_NAME)
 
-print(f"✅ Connected to project: {client.project}")
-print(f"📦 Using bucket: {BUCKET_NAME}/{FOLDER}")
+print(f"Connected to project: {client.project}")
+print(f"Using bucket: {BUCKET_NAME}/{FOLDER}")
 
 # ============================================================
 # 3. List all parquet files
 # ============================================================
 blobs = list(bucket.list_blobs(prefix=FOLDER))
 parquet_files = [b for b in blobs if b.name.endswith(".parquet")]
-print(f"📁 Found {len(parquet_files)} parquet files in {FOLDER}\n")
+print(f"Found {len(parquet_files)} parquet files in {FOLDER}\n")
 
 # ============================================================
 # 4. Choose a sample file (for testing bias on one)
@@ -40,13 +40,13 @@ print(f"📁 Found {len(parquet_files)} parquet files in {FOLDER}\n")
 # You can manually change which file you want here:
 SAMPLE_FILE = "raw/ai_in_healthcare_raw.parquet"
 
-print(f"🎯 Loading file: {SAMPLE_FILE}")
+print(f"Loading file: {SAMPLE_FILE}")
 blob = bucket.blob(SAMPLE_FILE)
 data = blob.download_as_bytes()
 df = pd.read_parquet(BytesIO(data))
 
-print(f"✅ Loaded {len(df)} records from {SAMPLE_FILE}")
-print("\n📊 Columns available:")
+print(f"Loaded {len(df)} records from {SAMPLE_FILE}")
+print("\nColumns available:")
 print(df.columns.tolist())
-print("\n📄 Sample rows:")
+print("\nSample rows:")
 print(df.head(3))
