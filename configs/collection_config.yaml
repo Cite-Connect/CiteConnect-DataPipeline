@@ -1,0 +1,57 @@
+# ============================================
+# CiteConnect Collection Configuration
+# ============================================
+
+# Schedule - when to run automatically
+schedule:
+  interval: "@weekly"  # Every Sunday at midnight
+  start_date: "2024-12-08"
+  catchup: false
+
+# Email notifications
+notifications:
+  email_recipients:
+    - "anushasrini2001@gmail.com"
+  email_on_success: true
+  email_on_failure: true
+
+# Taxonomy - domains and their search terms
+taxonomy:
+  AI:
+    enabled: true   # Set false to skip this domain
+    priority: 1     # Run first
+    search_terms:
+      - "machine_learning"
+      - "Neural Networks"
+      - "computer vision"
+      - "natural language processing"
+      - "Graph Neural Networks"
+  
+  Healthcare:
+    enabled: true
+    priority: 2
+    search_terms:
+      - "Disease Prediction"
+      - "Drug Discovery"
+      - "Electronic Health Records"
+      - "Medical Imaging"
+      - "Genomics"
+  
+  Quantum:
+    enabled: true
+    priority: 3
+    search_terms:
+      - "Quantum Algorithms"
+      - "Quantum Error Correction"
+      - "Quantum Machine Learning"
+      - "Quantum Simulation"
+  
+  Finance:
+    enabled: true
+    priority: 4
+    search_terms:
+      - "Algorithmic Trading"
+      - "Credit Risk Scoring"
+      - "Fraud Detection"
+      - "Portfolio Optimization"
+      - "Blockchain Cryptocurrency"
