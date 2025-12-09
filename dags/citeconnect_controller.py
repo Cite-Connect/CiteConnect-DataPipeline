@@ -151,17 +151,14 @@ for domain_name, domain_config in enabled_domains:
     # Trigger task - triggers your EXISTING test_citeconnect DAG
     trigger_task = TriggerDagRunOperator(
         task_id=f'trigger_{domain_name.lower()}',
-        trigger_dag_id='test_citeconnect',  # YOUR ORIGINAL DAG (unchanged!)
+        trigger_dag_id='test_citeconnect',
         conf={
             'SEARCH_TERMS': search_terms_str,
             'COLLECTION_DOMAIN': domain_name,
             'COLLECTION_SUBDOMAINS': ''
-            # PAPERS_PER_TERM not included - uses env variable (100)
         },
-        wait_for_completion=True,  # Wait for triggered DAG to finish before moving to next
-        poke_interval=60,  # Check status every 60 seconds
-        execution_date_fn=lambda dt: dt,  # Use same execution date
-        reset_dag_run=False,  # Don't reset if already running
+        wait_for_completion=True,
+        poke_interval=60,
         dag=dag
     )
     
@@ -191,4 +188,4 @@ else:
     # If no domains enabled, still create the task (but it will run alone)
     notification_task
 
-print(" Controller DAG created successfully")
+print("✅ Controller DAG created successfully")
