@@ -21,37 +21,22 @@ taxonomy:
     enabled: true   # Set false to skip this domain
     priority: 1     # Run first
     search_terms:
-      - "machine learning"
-      - "Neural Networks"
       - "computer vision"
-      - "natural language processing"
-      - "Graph Neural Networks"
   
   Healthcare:
     enabled: true
     priority: 2
     search_terms:
-      - "Disease Prediction"
-      - "Drug Discovery"
-      - "Electronic Health Records"
       - "Medical Imaging"
-      - "Genomics"
   
   Quantum:
-    enabled: true
+    enabled: false
     priority: 3
     search_terms:
-      - "Quantum Algorithms"
-      - "Quantum Error Correction"
       - "Quantum Machine Learning"
-      - "Quantum Simulation"
   
   Finance:
-    enabled: true
+    enabled: false
     priority: 4
     search_terms:
       - "Algorithmic Trading"
-      - "Credit Risk Scoring"
-      - "Fraud Detection"
-      - "Portfolio Optimization"
-      - "Blockchain Cryptocurrency"
