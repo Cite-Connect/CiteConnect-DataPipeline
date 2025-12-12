@@ -239,9 +239,50 @@ class AnomalyDetector:
 
 class SchemaValidator:
     """Validates data schema and tracks quality over time"""
-    
-    def __init__(self, schema_dir: str = "data/schemas"):
-        self.schema_dir = Path(schema_dir)
+
+    def __init__(self, schema_dir: str = None):
+        """
+        schema_dir selection priority:
+        1) Environment variable SCHEMA_DIR (if provided and writable)
+        2) Writable Airflow-mounted working dir: /opt/airflow/working_data/schemas
+        3) System temp: /tmp/airflow_schemas
+        4) Local fallback: ./schemas
+        """
+        # Allow override via environment
+        env_dir = os.getenv("SCHEMA_DIR")
+
+        # Candidate dirs in priority order
+        possible_dirs = []
+        if schema_dir:
+            possible_dirs.append(schema_dir)
+        if env_dir:
+            possible_dirs.append(env_dir)
+        possible_dirs.extend([
+            "/opt/airflow/working_data/schemas",  # Mounted, typically writable
+            "/tmp/airflow_schemas",               # Temp dir always writable
+            "./schemas"                           # Local fallback
+        ])
+
+        chosen_dir = None
+        for dir_path in possible_dirs:
+            try:
+                test_path = Path(dir_path)
+                test_path.mkdir(parents=True, exist_ok=True)
+                # Test write permission
+                test_file = test_path / ".write_test"
+                test_file.write_text("test")
+                test_file.unlink()
+                chosen_dir = dir_path
+                print(f"✅ Using schema directory: {chosen_dir}")
+                break
+            except (PermissionError, OSError):
+                print(f"⚠️ Cannot use {dir_path}, trying next location...")
+                continue
+
+        if chosen_dir is None:
+            raise RuntimeError("Cannot find a writable directory for schema storage")
+
+        self.schema_dir = Path(chosen_dir)
         self.schema_dir.mkdir(parents=True, exist_ok=True)
         self.anomaly_detector = AnomalyDetector(history_window=10)
         
