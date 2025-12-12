@@ -409,14 +409,14 @@ def check_bias_and_send_alert():
             smtp_pass = os.getenv('SMTP_PASSWORD')
             
             if smtp_user and smtp_pass:
-        send_email(
-            to=EMAIL_TO,
-            subject=subject,
-            html_content=html_content
-        )
+                send_email(
+                    to=EMAIL_TO,
+                    subject=subject,
+                    html_content=html_content
+                )
                 print(f"🚨 Bias alert email sent! Disparity difference ({disparity_diff:.2f}) exceeded threshold {THRESHOLD}.")
                 print(f"   Collection recommendations included in email.")
-        return "alert_sent"
+                return "alert_sent"
             else:
                 print(f"⚠️ SMTP credentials not configured. Skipping email alert.")
                 print(f"🚨 Bias threshold exceeded (difference: {disparity_diff:.2f} > {THRESHOLD})")
@@ -458,7 +458,7 @@ def mitigate_and_recheck_bias(**context):
         max_fields = int(dag_run.conf.get('BIAS_MITIGATION_MAX_FIELDS', 5))
     elif dag_run and hasattr(dag_run, 'dag') and dag_run.dag.params:
         max_fields = int(dag_run.dag.params.get('BIAS_MITIGATION_MAX_FIELDS', 5))
-        else:
+    else:
         max_fields = int(os.getenv('BIAS_MITIGATION_MAX_FIELDS', '5'))
     
     print(f"🚀 Starting automated bias mitigation...")
