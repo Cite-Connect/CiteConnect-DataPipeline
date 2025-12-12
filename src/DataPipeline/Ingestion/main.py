@@ -494,15 +494,20 @@ async def collect_and_process_pipeline_async(
                         
                         # Collect referenced papers using the /references endpoint
                         referenced_papers = []
-                        max_refs_per_paper = int(os.getenv('MAX_REFERENCES_PER_PAPER', '0'))  # 0 = collect all, >0 = limit per paper
-                        if max_refs_per_paper == 0:
-                            logging.info(f"[{term}] 📚 Collecting ALL references from {len(seed_paper_ids)} seed papers using /references endpoint...")
-                        else:
-                            logging.info(f"[{term}] 📚 Collecting references (max {max_refs_per_paper} per seed paper) from {len(seed_paper_ids)} seed papers...")
+                        max_refs_per_paper = int(os.getenv('MAX_REFERENCES_PER_PAPER', '50'))
                         
-                        # Always collect references (0 = all, >0 = limited)
-                        references_dict = {}  # Map paper_id -> list of reference IDs
-                        if seed_paper_ids:
+                        # Check if we should collect references at all
+                        if max_refs_per_paper == 0:
+                            # Skip reference collection entirely
+                            logging.info(f"[{term}] ⏭️  Skipping reference collection (MAX_REFERENCES_PER_PAPER=0)")
+                            references_dict = {}
+                            # Add empty references_id to seed papers
+                            for paper in seed_papers:
+                                paper["references_id"] = []
+                        elif seed_paper_ids:
+                            # Collect references with limit
+                            logging.info(f"[{term}] 📚 Collecting references (max {max_refs_per_paper} per seed paper) from {len(seed_paper_ids)} seed papers...")
+                            references_dict = {}  # Map paper_id -> list of reference IDs
                             try:
                                 # Get references for each seed paper (to add to metadata)
                                 from .semantic_scholar_client import get_papers_references_batch_async
@@ -510,7 +515,7 @@ async def collect_and_process_pipeline_async(
                                     session,
                                     seed_paper_ids,
                                     api_key=api_key,
-                                    max_references_per_paper=max_refs_per_paper if max_refs_per_paper > 0 else None,
+                                    max_references_per_paper=max_refs_per_paper,
                                     max_concurrent=10
                                 )
                                 
@@ -604,13 +609,19 @@ async def collect_and_process_pipeline_async(
                         
                         # Save raw papers locally
                         safe_name = re.sub(r"[^\w\s-]", "", term).replace(" ", "_")
-                        local_filename = f"{raw_output_dir}/raw_{safe_name}_{int(time.time())}.parquet"
+                        timestamp = int(time.time())
+                        
+                        # Add mitigation prefix if this is a bias mitigation collection
+                        is_mitigation = os.getenv('IS_BIAS_MITIGATION', 'false').lower() == 'true'
+                        prefix = "mitigation_" if is_mitigation else ""
+                        
+                        local_filename = f"{raw_output_dir}/raw_{prefix}{safe_name}_{timestamp}.parquet"
                         Path(raw_output_dir).mkdir(parents=True, exist_ok=True)
                         pd.DataFrame(all_papers).to_parquet(local_filename, index=False)
                         logging.info(f"[{term}] 💾 Saved locally: {local_filename}")
                         
-                        # Async GCS upload to raw_v2/ folder
-                        gcs_path = f"raw_v2/{safe_name}_v2_{int(time.time())}.parquet"
+                        # Async GCS upload to raw_v2/ folder (with mitigation prefix if applicable)
+                        gcs_path = f"raw_v2/{prefix}{safe_name}_v2_{timestamp}.parquet"
                         await upload_to_gcs_async(local_filename, GCS_BUCKET, gcs_path)
                         
                         result = {
@@ -700,15 +711,21 @@ async def collect_and_process_pipeline_async(
                     
                     processed = unique_processed
                     
-                    # Save processed results locally
+                    # Save processed results locally with timestamp
                     safe_name = re.sub(r"[^\w\s-]", "", term).replace(" ", "_")
-                    processed_filename = f"{processed_output_dir}/processed_{safe_name}_{int(time.time())}.parquet"
+                    timestamp = int(time.time())
+                    
+                    # Add mitigation prefix if this is a bias mitigation collection
+                    is_mitigation = os.getenv('IS_BIAS_MITIGATION', 'false').lower() == 'true'
+                    prefix = "mitigation_" if is_mitigation else ""
+                    
+                    processed_filename = f"{processed_output_dir}/processed_{prefix}{safe_name}_{timestamp}.parquet"
                     Path(processed_output_dir).mkdir(parents=True, exist_ok=True)
                     pd.DataFrame(processed).to_parquet(processed_filename, index=False)
                     logging.info(f"[{term}] 💾 Saved processed locally: {processed_filename}")
                     
-                    # Async GCS upload to processed_v2/ folder
-                    processed_gcs_path = f"processed_v2/{safe_name}_v2_processed.parquet"
+                    # Async GCS upload to processed_v2/ folder (with mitigation prefix and timestamp)
+                    processed_gcs_path = f"processed_v2/processed_{prefix}{safe_name}_{timestamp}.parquet"
                     await upload_to_gcs_async(processed_filename, GCS_BUCKET, processed_gcs_path)
                     
                     result = {

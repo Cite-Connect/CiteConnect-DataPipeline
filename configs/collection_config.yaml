@@ -21,7 +21,7 @@ taxonomy:
     enabled: true   # Set false to skip this domain
     priority: 1     # Run first
     search_terms:
-      - "machine_learning"
+      - "machine learning"
       - "Neural Networks"
       - "computer vision"
       - "natural language processing"

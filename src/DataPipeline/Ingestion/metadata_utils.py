@@ -42,30 +42,9 @@ def extract_metadata(paper, search_term):
     # Get domain from environment (use directly, no mapping)
     domain = os.getenv('COLLECTION_DOMAIN', 'general')
     
-    # Get subdomains from environment and match with search term
-    sub_domains = []
-    subdomains_env = os.getenv('COLLECTION_SUBDOMAINS', '')
-    
-    if subdomains_env:
-        subdomain_list = [s.strip() for s in subdomains_env.split(',')]
-        normalized_term = search_term.lower().strip()
-        
-        # Find matching subdomains
-        for subdomain in subdomain_list:
-            subdomain_lower = subdomain.lower().strip()
-            # Check if search term matches subdomain (either contains or is contained)
-            if subdomain_lower in normalized_term or normalized_term in subdomain_lower:
-                sub_domains.append(subdomain.strip())
-        
-        # If no match found, add the search term itself as a subdomain
-        if not sub_domains:
-            sub_domains.append(search_term.strip())
-    else:
-        # No subdomains configured, use search term
-        sub_domains = [search_term.strip()]
-    
-    # Calculate confidence (1.0 if domain is set, 0.5 if default)
-    domain_confidence = 1.0 if domain != 'general' else 0.5
+    # Subdomain = search_term (1:1 mapping as per user requirement)
+    # User collects papers with search_term matching the subdomain name
+    sub_domains = [search_term.strip()]
     
     # Handle authors safely (can be None or not a list)
     authors_data = paper.get("authors") or []
@@ -92,8 +71,7 @@ def extract_metadata(paper, search_term):
         "citations": citations,    # TEXT[] array for PostgreSQL
         "fieldsOfStudy": json.dumps(fields_of_study),
         "domain": domain,  # ✅ Primary domain from COLLECTION_DOMAIN
-        "sub_domains": sub_domains,  # ✅ Sub-domains array (matched from COLLECTION_SUBDOMAINS)
-        "domain_confidence": domain_confidence,  # ✅ Confidence score
+        "sub_domains": sub_domains,  # ✅ Sub-domains array (search_term)
         "pdf_url": safe_get(paper, "openAccessPdf", "url"),
         "tldr": safe_get(paper, "tldr", "text"),
         "introduction": None,

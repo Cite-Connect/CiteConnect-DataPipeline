@@ -34,7 +34,10 @@ dag = DAG(
     params={
         'SEARCH_TERMS': 'computer vision',  # Default search terms
         'COLLECTION_DOMAIN': 'AI',  # Default domain
-        'COLLECTION_SUBDOMAINS': ''  # Default subdomains (comma-separated)
+        'COLLECTION_SUBDOMAINS': '',  # Default subdomains (comma-separated)
+        'PAPERS_PER_TERM': 100,  # Number of papers to collect per search term
+        'MAX_REFERENCES_PER_PAPER': 50,  # Max references to collect per seed paper
+        'BIAS_MITIGATION_MAX_FIELDS': 5  # Max underrepresented fields to target for mitigation
     }
 )
 
@@ -177,6 +180,7 @@ def test_paper_collection(**context):
     from src.DataPipeline.Ingestion.main import collect_and_process_pipeline
     import os
     import json
+    from pathlib import Path
     
     # Get config from DAG run params/config (priority) or environment variables (fallback)
     dag_run = context.get('dag_run')
@@ -195,14 +199,46 @@ def test_paper_collection(**context):
         params = {
             'SEARCH_TERMS': os.getenv('SEARCH_TERMS', 'finance, quantum computing, healthcare'),
             'COLLECTION_DOMAIN': os.getenv('COLLECTION_DOMAIN', 'general'),
-            'COLLECTION_SUBDOMAINS': os.getenv('COLLECTION_SUBDOMAINS', '')
+            'COLLECTION_SUBDOMAINS': os.getenv('COLLECTION_SUBDOMAINS', ''),
+            'PAPERS_PER_TERM': int(os.getenv('PAPERS_PER_TERM', '100')),
+            'MAX_REFERENCES_PER_PAPER': int(os.getenv('MAX_REFERENCES_PER_PAPER', '50'))
         }
         print(f"📋 Using config from environment variables: {json.dumps(params, indent=2)}")
     
-    # Extract config values
+    # Extract config values (priority: params → environment → defaults)
     search_terms_str = params.get('SEARCH_TERMS', 'finance, quantum computing, healthcare')
     search_terms = [term.strip() for term in search_terms_str.split(',') if term.strip()]
-    limit = int(os.getenv('PAPERS_PER_TERM', '100'))  # Still use env for limit
+    limit = int(params.get('PAPERS_PER_TERM', 100))
+    max_references = int(params.get('MAX_REFERENCES_PER_PAPER', 50))
+    
+    # Save collection config for bias analysis to use (local cache + GCS)
+    config_dir = Path("/opt/airflow/databias_v2/slices")
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "collection_config.json"
+    
+    config_data = {
+        'search_terms': search_terms_str,
+        'papers_per_term': limit,
+        'max_references_per_paper': max_references,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Save locally
+    with open(config_file, 'w') as f:
+        json.dump(config_data, f, indent=2)
+    print(f"💾 Saved collection config locally: {config_file}")
+    
+    # Also save to GCS
+    try:
+        from google.cloud import storage
+        bucket_name = os.getenv('GCS_BUCKET_NAME', 'citeconnect-test-bucket')
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob("databias_v2/slices/collection_config.json")
+        blob.upload_from_string(json.dumps(config_data, indent=2), content_type='application/json')
+        print(f"📤 Uploaded collection config to GCS")
+    except Exception as e:
+        print(f"⚠️ Could not upload config to GCS: {e}")
     
     collection_domain = params.get('COLLECTION_DOMAIN', 'general')
     collection_subdomains = params.get('COLLECTION_SUBDOMAINS', '')
@@ -212,14 +248,17 @@ def test_paper_collection(**context):
     original_domain = os.environ.get('COLLECTION_DOMAIN')
     original_subdomains = os.environ.get('COLLECTION_SUBDOMAINS')
     original_search_terms = os.environ.get('SEARCH_TERMS')
+    original_max_refs = os.environ.get('MAX_REFERENCES_PER_PAPER')
     
     try:
         os.environ['COLLECTION_DOMAIN'] = collection_domain
         os.environ['COLLECTION_SUBDOMAINS'] = collection_subdomains
         os.environ['SEARCH_TERMS'] = search_terms_str  # Set for reference, but we pass directly
+        os.environ['MAX_REFERENCES_PER_PAPER'] = str(max_references)
         
         print(f"🔍 Search terms: {search_terms}")
         print(f"📊 Papers per term: {limit}")
+        print(f"📚 Max references per paper: {max_references}")
         print(f"🏷️  Collection Domain: {collection_domain}")
         print(f"🏷️  Collection Subdomains: {collection_subdomains}")
         print(f"🚀 Using async pipeline with overlapping collection/preprocessing")
@@ -272,160 +311,26 @@ def test_paper_collection(**context):
             os.environ['SEARCH_TERMS'] = original_search_terms
         elif 'SEARCH_TERMS' in os.environ:
             del os.environ['SEARCH_TERMS']
+            
+        if original_max_refs is not None:
+            os.environ['MAX_REFERENCES_PER_PAPER'] = original_max_refs
+        elif 'MAX_REFERENCES_PER_PAPER' in os.environ:
+            del os.environ['MAX_REFERENCES_PER_PAPER']
 
-def preprocess_papers(**context):
-    """
-    Preprocess papers. Note: If using async pipeline, preprocessing is already done
-    during collection. This task will skip if preprocessing was already completed.
-    """
-    import os  # Import at the top to avoid UnboundLocalError
-    print("Testing paper preprocessing...")
-
-    ti = context['task_instance']
-    collection_data = ti.xcom_pull(task_ids='test_paper_collection')
-    
-    # Handle both old format (list) and new format (dict with collection_results)
-    if isinstance(collection_data, dict) and 'collection_results' in collection_data:
-        collection_results = collection_data.get('collection_results', [])
-        config = collection_data.get('config', {})
-        # Set env vars from config for this task
-        if config:
-            os.environ['COLLECTION_DOMAIN'] = config.get('COLLECTION_DOMAIN', os.getenv('COLLECTION_DOMAIN', 'general'))
-            os.environ['COLLECTION_SUBDOMAINS'] = config.get('COLLECTION_SUBDOMAINS', os.getenv('COLLECTION_SUBDOMAINS', ''))
-    elif isinstance(collection_data, list):
-        # Old format: collection_data is a list directly
-        collection_results = collection_data
-    else:
-        collection_results = []
-    
-    if not collection_results:
-        raise ValueError("No collection results received")
-    
-    # Check if preprocessing was already done (async pipeline does both)
-    # If papers were already processed, we can skip this step
-    processed_dir = "/tmp/test_data/processed"
-    if os.path.exists(processed_dir) and os.listdir(processed_dir):
-        print("✅ Preprocessing already completed by async pipeline. Skipping...")
-        # Return a placeholder result - ensure collection_results is a list of dicts
-        if collection_results and isinstance(collection_results, list):
-            return [{'search_term': r.get('search_term', 'unknown'), 'status': 'already_processed'} for r in collection_results if isinstance(r, dict)]
-        else:
-            # Fallback if format is unexpected
-            return [{'status': 'already_processed', 'note': 'Preprocessing completed by async pipeline'}]
-    
-    # Fallback: Process if not already done
-    from src.DataPipeline.Ingestion.main import process_collected_papers
-    
-    # Ensure collection_results is a list of dicts
-    if not isinstance(collection_results, list):
-        raise ValueError(f"Expected collection_results to be a list, got {type(collection_results)}")
-    
-    results = process_collected_papers(
-        collection_results=collection_results,
-        output_dir=processed_dir
-    )
-    
-    print(f"Processing completed: {len(results)} terms processed")
-    print("Processed files uploaded to GCS:")
-    for result in results:
-        print(f"  {result['search_term']}: {result['processed_gcs']}")
-    
-    return results
-
-def embed_stored_data():
-    import sys
-    if '/opt/airflow' not in sys.path:
-        sys.path.insert(0, '/opt/airflow')
-
-    from services.embedding_service import EmbeddingService
-    
-    service = EmbeddingService(
-        bucket_name="citeconnect-test-bucket",
-        gcs_prefix="raw/",
-        flat_structure=True,
-        gcs_project_id="strange-calling-476017-r5"
-    )
-    
-    return service.process_domain("healthcare", batch_size=10, max_papers=1000, use_streaming=True)
-
-
-def load_bias_data_from_gcs():
-    """Load all parquet files from GCS and combine them for bias analysis."""
-    import pandas as pd
-    import json
-    import numpy as np
-    from utils.gcs_reader import GCSReader
-    
-    print("Loading data from GCS for bias analysis ...")
-    
-    # Set working directory to project root
-    project_root = '/opt/airflow'
-    data_path = os.path.join(project_root, "data/combined_gcs_data.parquet")
-    
-    # Check if data already exists
-    if os.path.exists(data_path):
-        print(f"✅ Data file already exists at {data_path}. Skipping download.")
-        return "data_loaded"
-    
-    try:
-        # Initialize GCS reader
-        reader = GCSReader(
-            bucket_name="citeconnect-test-bucket",
-            project_id="strange-calling-476017-r5"
-        )
-        
-        # Load all parquet files from raw/ folder
-        print("📥 Loading all parquet files from citeconnect-test-bucket/raw/")
-        df_all = reader.read_all_from_domain(
-            domain="",
-            custom_prefix="raw/",
-            flat_structure=True
-        )
-        
-        if df_all.empty:
-            raise ValueError("No data loaded from GCS!")
-        
-        print(f"✅ Loaded {len(df_all)} total records from GCS")
-        
-        # Clean up any dict/list/ndarray columns before saving
-        def safe_serialize(val):
-            """Convert dicts, lists, or arrays into JSON-safe strings"""
-            if isinstance(val, (dict, list, np.ndarray)):
-                try:
-                    return json.dumps(val, default=str)
-                except Exception:
-                    return str(val)
-            return val
-
-        for col in df_all.columns:
-            if df_all[col].dtype == 'object':
-                df_all[col] = df_all[col].apply(safe_serialize)
-        
-        # Save to local file
-        os.makedirs(os.path.join(project_root, "data"), exist_ok=True)
-        df_all.to_parquet(data_path, index=False)
-        
-        print(f"💾 Saved merged data to {data_path}")
-        print(f"📊 Columns: {df_all.columns.tolist()}")
-        print(f"📊 Shape: {df_all.shape}")
-        
-        return "data_loaded"
-        
-    except Exception as e:
-        print(f"❌ Error loading data from GCS: {e}")
-        raise
+# Removed: embed_stored_data function - embeddings handled by Supabase webhook
+# Removed: load_bias_data_from_gcs task - bias analysis loads directly from GCS processed_v2/ folder
 
 
 def run_bias_slicing():
+    """
+    Run bias analysis script which loads data directly from GCS processed_v2/ folder.
+    No local data file required - script accesses GCS directly.
+    """
     print("Running Fairlearn slicing analysis ...")
+    print("📥 Script will load data directly from gs://citeconnect-test-bucket/processed_v2/")
     
     # Set working directory to project root
     project_root = '/opt/airflow'
-    
-    # Check if data file exists
-    data_path = os.path.join(project_root, "data/combined_gcs_data.parquet")
-    if not os.path.exists(data_path):
-        raise FileNotFoundError(f"Data file not found: {data_path}. Run GCS data loading first.")
     
     result = subprocess.run(
         ["python", "databias/slicing_bias_analysis.py"],
@@ -442,16 +347,17 @@ def run_bias_slicing():
     if result.returncode != 0:
         raise RuntimeError(f"Bias slicing script failed with exit code: {result.returncode}")
     
-    print("✅ Bias slicing completed. Results saved in databias/slices/")
+    print("✅ Bias slicing completed. Results saved to GCS: databias_v2/slices/")
     return "bias_slicing_done"
 
 
 def check_bias_and_send_alert():
     print("Checking fairness_disparity.json ...")
     
-    # Use absolute path to project root
+    # Use absolute path to project root (v2 paths)
     project_root = '/opt/airflow'
-    disparity_path = os.path.join(project_root, "databias/slices/fairness_disparity.json")
+    disparity_path = os.path.join(project_root, "databias_v2/slices/fairness_disparity.json")
+    recommendations_path = os.path.join(project_root, "databias_v2/slices/collection_recommendations.json")
     
     if not os.path.exists(disparity_path):
         raise ValueError(f"fairness_disparity.json not found at {disparity_path}. Run slicing first.")
@@ -465,15 +371,37 @@ def check_bias_and_send_alert():
     print(f"📈 Disparity ratio: {disparity_ratio:.2f}")
     print(f"📉 Disparity difference: {disparity_diff:.2f}")
 
-    THRESHOLD = 10.0  # 🔔 alert threshold for ratio
+    # Load collection recommendations if available
+    recommendations = []
+    if os.path.exists(recommendations_path):
+        with open(recommendations_path, "r") as f:
+            rec_data = json.load(f)
+            recommendations = rec_data.get("recommendations", [])[:5]  # Top 5
+    
+    THRESHOLD = 50.0  # 🔔 alert threshold for disparity difference
 
-    if disparity_ratio > THRESHOLD:
-        subject = f"⚠️ CiteConnect Bias Alert: Disparity ratio {disparity_ratio:.2f}"
+    if disparity_diff > THRESHOLD:
+        # Build recommendations HTML
+        rec_html = ""
+        if recommendations:
+            rec_html = "<h4>Collection Recommendations (Top 5 Underrepresented Domains):</h4><ul>"
+            for rec in recommendations:
+                rec_html += f"<li><b>{rec['domain']}</b>: Need {rec['papers_needed']} more papers "
+                rec_html += f"(currently: {rec['current_count']}, target: {rec['target_count']})<br>"
+                rec_html += f"Available subdomains to query: {', '.join(rec['available_subdomains'][:5])}</li>"
+            rec_html += "</ul>"
+        
+        subject = f"⚠️ CiteConnect Bias Alert: Disparity difference {disparity_diff:.2f}"
         html_content = f"""
         <h3>Bias Threshold Exceeded</h3>
-        <p><b>Disparity Ratio:</b> {disparity_ratio:.2f}<br>
-        <b>Disparity Difference:</b> {disparity_diff:.2f}</p>
-        <p>Check the detailed slice report in databias/slices/fairness_disparity.json</p>
+        <p><b>Disparity Ratio:</b> {disparity_ratio:.2f}x<br>
+        <b>Disparity Difference:</b> {disparity_diff:.2f} citations<br>
+        <b>Threshold:</b> {THRESHOLD}</p>
+        
+        {rec_html}
+        
+        <p><b>Action Required:</b> Run collection with recommended search queries to balance dataset.</p>
+        <p>View full details: <code>gs://{os.getenv('GCS_BUCKET_NAME', 'citeconnect-test-bucket')}/databias_v2/slices/collection_recommendations.json</code></p>
         """
         try:
             # Check if SMTP credentials are configured
@@ -481,21 +409,22 @@ def check_bias_and_send_alert():
             smtp_pass = os.getenv('SMTP_PASSWORD')
             
             if smtp_user and smtp_pass:
-                send_email(
-                    to=EMAIL_TO,
-                    subject=subject,
-                    html_content=html_content
-                )
-                print(f"🚨 Bias alert email sent! Ratio exceeded threshold {THRESHOLD}.")
-                return "alert_sent"
+        send_email(
+            to=EMAIL_TO,
+            subject=subject,
+            html_content=html_content
+        )
+                print(f"🚨 Bias alert email sent! Disparity difference ({disparity_diff:.2f}) exceeded threshold {THRESHOLD}.")
+                print(f"   Collection recommendations included in email.")
+        return "alert_sent"
             else:
                 print(f"⚠️ SMTP credentials not configured. Skipping email alert.")
-                print(f"🚨 Bias threshold exceeded (ratio: {disparity_ratio:.2f} > {THRESHOLD})")
+                print(f"🚨 Bias threshold exceeded (difference: {disparity_diff:.2f} > {THRESHOLD})")
                 print(f"   To enable email alerts, set SMTP_USER and SMTP_PASSWORD in .env file")
                 return "alert_threshold_exceeded_no_email"
         except Exception as e:
             print(f"⚠️ Failed to send email alert: {e}")
-            print(f"🚨 Bias threshold exceeded (ratio: {disparity_ratio:.2f} > {THRESHOLD})")
+            print(f"🚨 Bias threshold exceeded (difference: {disparity_diff:.2f} > {THRESHOLD})")
             print(f"   Task will continue despite email failure")
             return "alert_threshold_exceeded_email_failed"
     else:
@@ -508,223 +437,160 @@ bias_alert_task = PythonOperator(
     dag=dag
 )
 
-def mitigate_bias():
-    import pandas as pd
-    df = pd.read_parquet("data/combined_gcs_data_balanced.parquet")
-    print(f"✅ Loaded {len(df)} records for mitigation.")
-    print("Balancing underrepresented fields (simulation)...")
-    # Add balancing logic later if you retrain models here
-    balanced_path = "data/final_balanced_dataset.parquet"
-    df.to_parquet(balanced_path, index=False)
-    print(f"💾 Saved mitigated dataset → {balanced_path}")
-    return "bias_mitigated"
-
-def version_embeddings_with_dvc(**context):
-    import subprocess
-    import os
+def mitigate_and_recheck_bias(**context):
+    """
+    Automatically collect papers from underrepresented fields and re-check bias.
+    This task reads collection_recommendations.json (which includes papers_needed 
+    from bias detection) and triggers collection using those values.
+    """
+    import sys
     import json
-    from datetime import datetime
+    if '/opt/airflow' not in sys.path:
+        sys.path.insert(0, '/opt/airflow')
     
-    project_root = "/opt/airflow"
-    embeddings_path = os.path.join(project_root, "working_data/embeddings_db.pkl")
-    summary_path = os.path.join(project_root, "working_data/run_summary.json")
-
-    try:
-        git_dir = os.path.join(project_root, ".git")
-        if not os.path.exists(git_dir):
-            print("This appears to be a first-time run. Initializing Git repository...")
-            subprocess.run(['git', 'init', '-b', 'main'], check=True, capture_output=True, cwd=project_root)
-            print("Git repository initialized.")
+    from databias.bias_mitigation_collector import run_full_mitigation_cycle
+    
+    # Get configuration from DAG params (priority) or environment (fallback)
+    dag_run = context.get('dag_run')
+    max_fields = 5  # default
+    
+    if dag_run and dag_run.conf:
+        max_fields = int(dag_run.conf.get('BIAS_MITIGATION_MAX_FIELDS', 5))
+    elif dag_run and hasattr(dag_run, 'dag') and dag_run.dag.params:
+        max_fields = int(dag_run.dag.params.get('BIAS_MITIGATION_MAX_FIELDS', 5))
         else:
-            print("Git repository already initialized.")
-
-        dvc_dir = os.path.join(project_root, ".dvc")
-        if not os.path.exists(dvc_dir):
-            print("This appears to be a first-time run. Initializing DVC and remote...")
-            
-            subprocess.run(['dvc', 'init', '--no-scm'], check=True, capture_output=True, cwd=project_root)
-            print("DVC initialized.")
-            
-            subprocess.run(
-                ['dvc', 'remote', 'add', '-d', 'gcs', 'gs://citeconnect-test-bucket/dvc-cache'],
-                check=True, capture_output=True, cwd=project_root
-            )
-            print("DVC remote 'gcs' added.")
-            
-            subprocess.run(
-                ['dvc', 'remote', 'modify', 'gcs', 'credentialpath', '/opt/airflow/configs/credentials/gcs-key.json'],
-                check=True, capture_output=True, cwd=project_root
-            )
-            print("DVC remote 'gcs' credentials configured.")
-
-            subprocess.run(
-                ['git', 'config', '--global', '--add', 'safe.directory', project_root], 
-                check=True, capture_output=True, cwd=project_root
-            )
-            subprocess.run(['git', 'config', '--global', 'user.email', 'aditya811.abhinav@gmail.com'], check=True, cwd=project_root)
-            subprocess.run(['git', 'config', '--global', 'user.name', 'Abhinav Aditya'], check=True, cwd=project_root)
-            
-            subprocess.run(['git', 'add', '.dvc/config'], check=True, capture_output=True, cwd=project_root)
-            
-            subprocess.run(
-                ['git', 'commit', '-m', 'Initialize DVC and remote'],
-                check=True, capture_output=True, cwd=project_root
-            )
-            print("Initial DVC configuration committed to Git.")
-            
-        else:
-            print("DVC already initialized.")
-        
-        try:
-            result = subprocess.run(['dvc', 'remote', 'list'], capture_output=True, text=True, cwd=project_root)
-            if 'gcs' not in result.stdout:
-                print("DVC remote not found, re-adding...")
-                subprocess.run(
-                    ['dvc', 'remote', 'add', '-d', 'gcs', 'gs://citeconnect-test-bucket/dvc-cache'],
-                    check=True, capture_output=True, cwd=project_root
-                )
-                subprocess.run(
-                    ['dvc', 'remote', 'modify', 'gcs', 'credentialpath', '/opt/airflow/configs/credentials/gcs-key.json'],
-                    check=True, capture_output=True, cwd=project_root
-                )
-                print("DVC remote re-configured.")
-        except subprocess.CalledProcessError:
-            print("Warning: Could not verify DVC remote")
-        
-        
-        subprocess.run(
-            ['git', 'config', '--global', '--add', 'safe.directory', project_root], 
-            check=True, 
-            capture_output=True,
-            cwd=project_root
-        )
-
-        ti = context['task_instance']
-        embed_results = ti.xcom_pull(task_ids='embed_stored_data') or {}
-        
-        file_size_mb = 0.0
-        if os.path.exists(embeddings_path):
-            file_size_mb = round(os.path.getsize(embeddings_path) / (1024*1024), 2)
-
-        embeddings_created = embed_results.get('embedded_chunks', 0)
-        total_papers = embed_results.get('total_papers', 0)
-        run_params = embed_results.get('params', {"status": "unknown"})
-        
-        # Get search terms from environment variable (same as test_paper_collection)
-        search_terms_env = os.getenv('SEARCH_TERMS', 'finance, quantum computing, healthcare')
-        search_terms_list = [term.strip() for term in search_terms_env.split(',')]
-        
-        summary_list = []
-        if os.path.exists(summary_path):
-            try:
-                with open(summary_path, 'r') as f:
-                    summary_list = json.load(f)
-                if not isinstance(summary_list, list):
-                    summary_list = [summary_list]
-            except json.JSONDecodeError:
-                summary_list = []
-
-        new_run_summary = {
-            "run_timestamp": datetime.now().isoformat(),
-            "params": run_params,
-            "outs": {
-                "embeddings_file": {
-                    "path": "working_data/embeddings_db.pkl",
-                    "file_size_mb": file_size_mb,
-                    "total_chunks": embeddings_created
-                },
-                "total_papers_processed": total_papers,
-                "search_terms": search_terms_list
-            }
-        }
-        
-        summary_list.append(new_run_summary)
-        
-        with open(summary_path, 'w') as f:
-            json.dump(summary_list, f, indent=4)
-        print(f"Appended new run to {summary_path}. Total runs logged: {len(summary_list)}")
-
-        # Git config
-        subprocess.run(['git', 'config', '--global', 'user.email', 'aditya811.abhinav@gmail.com'], check=True, cwd=project_root)
-        subprocess.run(['git', 'config', '--global', 'user.name', 'Abhinav Aditya'], check=True, cwd=project_root)
-        
-        # DVC add
-        if os.path.exists(embeddings_path):
-            subprocess.run(['dvc', 'add', embeddings_path], check=True, capture_output=True, cwd=project_root)
-            print("Added embeddings to DVC tracking")
-            embed_dvc_file = f"{embeddings_path}.dvc"
-            subprocess.run(['git', 'add', embed_dvc_file], check=True, capture_output=True, cwd=project_root)
-            print("Added .dvc file to git")
-
-        # Git add summary
-        subprocess.run(['git', 'add', '-f', summary_path], check=True, capture_output=True, cwd=project_root)
-        print("Added run_summary.json to git")
-
-        try:
-            subprocess.run(['git', 'add', '.gitignore'], check=True, capture_output=True, cwd=project_root)
-        except subprocess.CalledProcessError:
-            pass
-        
-        # Git commit
-        commit_msg = f"Update embeddings: {embeddings_created} chunks, {total_papers} papers - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-        
-        subprocess.run(
-            ['git', 'commit', '--allow-empty', '-m', commit_msg], 
-            check=True, 
-            capture_output=True, 
-            cwd=project_root
-        )
-        print(f"Git commit: {commit_msg}")
-        
-        # DVC Push
-        if os.path.exists(embeddings_path):
-            subprocess.run(['dvc', 'push'], check=True, capture_output=True, cwd=project_root)
-            print("Pushed to DVC remote")
-        
-        new_run_summary["status"] = "success"
-        new_run_summary["commit_message"] = commit_msg
-        return new_run_summary
-        
-    except subprocess.CalledProcessError as e:
-        error_msg = f"DVC/Git command failed: {e.stderr.decode() if e.stderr else e.stdout.decode() if e.stdout else str(e)}"
-        print(f"Error: {error_msg}")
-        return {"status": "failed", "error": error_msg}  # FIXED: Return instead of raise
-    except Exception as e:
-        error_msg = f"Unexpected error: {e}"
-        print(f"Error: {error_msg}")
-        return {"status": "failed", "error": error_msg}  # FIXED: Return instead of raise
+        max_fields = int(os.getenv('BIAS_MITIGATION_MAX_FIELDS', '5'))
+    
+    print(f"🚀 Starting automated bias mitigation...")
+    print(f"   Max fields to target: {max_fields}")
+    print(f"   Papers per query: Determined by bias analysis (papers_needed)")
+    
+    # Check if recommendations exist (i.e., bias was detected)
+    recommendations_path = "/opt/airflow/databias_v2/slices/collection_recommendations.json"
+    if not os.path.exists(recommendations_path):
+        print("⚠️ No collection recommendations found. Skipping mitigation.")
+        print("   (Bias analysis may not have detected significant issues)")
+        return {'status': 'skipped', 'reason': 'no_recommendations'}
+    
+    # Run the full mitigation cycle (uses bias-detected paper counts)
+    result = run_full_mitigation_cycle(
+        max_fields=max_fields,
+        recheck_bias=True
+    )
+    
+    if result['status'] == 'success':
+        collection_results = result.get('collection_results', {})
+        papers_collected = collection_results.get('papers_collected', 0)
+        print(f"\n✅ Bias mitigation completed successfully!")
+        print(f"   Papers collected: {papers_collected}")
+        print(f"   Bias has been re-analyzed with new papers")
+        return result
+    else:
+        error_msg = result.get('error', 'Unknown error')
+        print(f"\n❌ Bias mitigation failed: {error_msg}")
+        # Don't raise exception - let pipeline continue
+        return result
 
 def generate_schema_and_stats(**context):
     """Generate schema and validate data quality"""
     from src.DataPipeline.Validation.schema_validator import validate_schema
     return validate_schema(**context)
 
+def upload_to_supabase(**context):
+    """Upload papers from GCS to Supabase database"""
+    import asyncio
+    import concurrent.futures
+    import threading
+    from src.DataPipeline.Processing.upload_papers_to_supabase import upload_papers_to_supabase_async
+
+    print("🚀 Starting Supabase upload task...")
+
+    # Get config from DAG params if available
+    dag_run = context.get('dag_run')
+    max_papers = None
+    batch_size = 100
+
+    if dag_run and dag_run.conf:
+        max_papers = dag_run.conf.get('MAX_PAPERS_UPLOAD')
+        batch_size = dag_run.conf.get('UPLOAD_BATCH_SIZE', 100)
+
+    print(f"📋 Config: max_papers={max_papers}, batch_size={batch_size}")
+
+    def run_async_upload():
+        """Run the async upload in a separate thread with its own event loop"""
+        try:
+            # Create new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            result = loop.run_until_complete(upload_papers_to_supabase_async(
+                max_papers=max_papers,
+                batch_size=batch_size
+            ))
+
+            loop.close()
+            return result
+        except Exception as e:
+            print(f"❌ Async upload failed: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    try:
+        print("🔄 Starting upload in thread...")
+        # Run in thread pool to avoid blocking Airflow
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_async_upload)
+            result = future.result(timeout=600)  # 10 minute timeout
+
+        print(f"✅ Supabase upload completed successfully: {result}")
+        return result
+    except concurrent.futures.TimeoutError:
+        print("❌ Upload task timed out after 10 minutes")
+        raise Exception("Upload task timed out")
+    except Exception as e:
+        print(f"❌ Supabase upload failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
 def send_success_notification(**context):
     dag_run = context['dag_run']
     ti = context['task_instance']
     
     try:
-        version_results = ti.xcom_pull(task_ids='version_embeddings_dvc')
-        if not version_results:
-            # Fallback in case XCom pull fails
-            version_results = {"status": "success", "outs": {"embeddings_file": {}}}
+        # Pull results from collection_and_preprocessing task
+        collection_results = ti.xcom_pull(task_ids='collection_and_preprocessing')
+        if not collection_results:
+            collection_results = {}
         
-        # Extract key metrics
-        params = version_results.get('params', {})
-        outs = version_results.get('outs', {"embeddings_file": {}})
-        embed_file_stats = outs.get('embeddings_file', {})
+        # Extract collection results
+        collection_data = collection_results.get('collection_results', [])
+        config = collection_results.get('config', {})
         
-        papers_processed = outs.get('total_papers_processed', 'N/A')
-        chunks_created = embed_file_stats.get('total_chunks', 'N/A')
-        file_size = embed_file_stats.get('file_size_mb', 'N/A')
-        commit_msg = version_results.get('commit_message', 'N/A')
+        # Calculate totals
+        total_collected = sum(r.get('paper_count', 0) for r in collection_data)
+        total_references = sum(r.get('reference_count', 0) for r in collection_data)
+        
+        papers_processed = total_collected + total_references
+        chunks_created = papers_processed  # Each paper is a chunk
+        file_size = 'N/A'  # We don't track file size
+        
+        params = {
+            'domain': config.get('COLLECTION_DOMAIN', 'N/A'),
+            'search_terms': config.get('SEARCH_TERMS', 'N/A'),
+            'max_papers': config.get('PAPERS_PER_TERM', 'N/A'),
+            'max_references': config.get('MAX_REFERENCES_PER_PAPER', 'N/A'),
+            'batch_size': 'N/A'
+        }
 
     except Exception as e:
         print(f"Warning: Could not pull XCom data. Sending generic email. Error: {e}")
+        import traceback
+        traceback.print_exc()
         papers_processed = 'N/A'
         chunks_created = 'N/A'
         file_size = 'N/A'
-        commit_msg = 'N/A'
         params = {}
 
     
@@ -779,13 +645,18 @@ def send_success_notification(**context):
                 <li><strong>Parameters:</strong>
                     <ul>
                         <li>Domain: {params.get('domain', 'N/A')}</li>
-                        <li>Max Papers: {params.get('max_papers', 'N/A')}</li>
-                        <li>Batch Size: {params.get('batch_size', 'N/A')}</li>
-                        <li><strong>Overall Quality Score:</strong> {quality_score}%</li>
-                        <li><strong>Total Papers:</strong> {schema_results.get('total_papers', 'N/A') if schema_results else 'N/A'}</li>
+                        <li>Search Terms: {params.get('search_terms', 'N/A')}</li>
+                        <li>Papers Per Term: {params.get('max_papers', 'N/A')}</li>
+                        <li>Max References: {params.get('max_references', 'N/A')}</li>
                     </ul>
                 </li>
-                <li><strong>Commit:</strong> <span class="commit">"{commit_msg}"</span></li>
+                <li><strong>Quality Metrics:</strong>
+                    <ul>
+                        <li>Overall Score: {quality_score}%</li>
+                        <li>Total Papers: {schema_results.get('total_papers', 'N/A') if schema_results else 'N/A'}</li>
+                        <li>Anomalies: {schema_results.get('anomaly_count', 0) if schema_results else 0}</li>
+                    </ul>
+                </li>
             </ul>
         </div>
 
@@ -794,11 +665,12 @@ def send_success_notification(**context):
             <li>✅ check_env_variables</li>
             <li>✅ check_gcs_connection</li>
             <li>✅ test_api_connection (Unit Tests)</li>
-            <li>✅ test_paper_collection</li>
-            <li>✅ preprocess_papers</li>
-            <li>✅ embed_stored_data</li>
-            <li>✅ version_embeddings_dvc (Data Versioning)</li>
+            <li>✅ collection_and_preprocessing</li>
+            <li>✅ bias_slicing_analysis (subdomain-based)</li>
+            <li>✅ bias_alert_check</li>
+            <li>✅ mitigate_and_recheck_bias</li>
             <li>✅ schema validation: SUCCESS</li>
+            <li>ℹ️  Embeddings: Handled by Supabase webhook</li>
         </ul>
 
         <h3>Pipeline Details</h3>
@@ -850,26 +722,15 @@ api_test_task = PythonOperator(
     dag=dag
 )
 
-collection_test_task = PythonOperator(
-    task_id='test_paper_collection',
+collection_and_preprocessing_task = PythonOperator(
+    task_id='collection_and_preprocessing',
     python_callable=test_paper_collection,
     trigger_rule='all_success',
     provide_context=True,  # Enable context to access params/config
     dag=dag
 )
 
-preprocess_task = PythonOperator(
-    task_id='preprocess_papers',
-    python_callable=preprocess_papers,
-    provide_context=True,
-    dag=dag
-)
-
-embed_task = PythonOperator(
-    task_id='embed_stored_data',
-    python_callable=embed_stored_data,
-    dag=dag
-)
+# Removed: embed_task - embeddings handled by Supabase webhook
 
 schema_stats_task = PythonOperator(
     task_id='generate_schema_and_stats',
@@ -877,11 +738,11 @@ schema_stats_task = PythonOperator(
     dag=dag
 )
 
-dvc_version_task = PythonOperator(
-    task_id='version_embeddings_dvc',
-    python_callable=version_embeddings_with_dvc,
-    provide_context=True,
-    dag=dag
+supabase_upload_task = PythonOperator(
+    task_id='upload_to_supabase',
+    python_callable=upload_to_supabase,
+    dag=dag,
+    trigger_rule='all_success'  # Only upload if all previous tasks succeeded
 )
 
 notification_task = PythonOperator(
@@ -890,12 +751,7 @@ notification_task = PythonOperator(
     dag=dag
 )
 
-load_bias_data_task = PythonOperator(
-    task_id='load_bias_data_from_gcs',
-    python_callable=load_bias_data_from_gcs,
-    dag=dag,
-    trigger_rule='all_done'
-)
+# Removed: load_bias_data_task - bias analysis loads directly from GCS!
 
 bias_slicing_task = PythonOperator(
     task_id='bias_slicing_analysis',
@@ -905,13 +761,16 @@ bias_slicing_task = PythonOperator(
 )
 
 bias_mitigation_task = PythonOperator(
-    task_id='bias_mitigation',
-    python_callable=mitigate_bias,
-    dag=dag
+    task_id='mitigate_and_recheck_bias',
+    python_callable=mitigate_and_recheck_bias,
+    provide_context=True,
+    dag=dag,
+    trigger_rule='all_done'  # Run even if alert fails
 )
 
+# Removed: embed_task - embeddings handled by Supabase webhook
 
 
 initial_checks = [env_check_task, gcs_check_task, api_test_task]
-initial_checks >> collection_test_task >> preprocess_task >> load_bias_data_task >> bias_slicing_task >> bias_alert_task >> bias_mitigation_task >> embed_task >> dvc_version_task >> schema_stats_task >> notification_task
+initial_checks >> collection_and_preprocessing_task >> bias_slicing_task >> bias_alert_task >> bias_mitigation_task >> schema_stats_task >> supabase_upload_task >> notification_task
 
