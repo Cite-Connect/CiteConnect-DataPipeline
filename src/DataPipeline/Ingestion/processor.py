@@ -7,23 +7,23 @@ from .metadata_utils import extract_metadata
 def _process_single_paper(paper, search_term, index, total):
     """Process a single paper (used by ThreadPoolExecutor)"""
     extractor = ContentExtractor()  # Create extractor per thread for thread safety
-        title = paper.get("title", "Unknown")
+    title = paper.get("title", "Unknown")
     logging.info(f"\nPaper {index}/{total}: {title[:60]}")
 
-        record = extract_metadata(paper, search_term)
-        content, method, quality = extractor.extract_content(paper)
+    record = extract_metadata(paper, search_term)
+    content, method, quality = extractor.extract_content(paper)
 
-        if content:
-            record.update({
-                "introduction": content,
-                "extraction_method": method,
-                "content_quality": quality,
-                "has_intro": True,
-                "intro_length": len(content),
-                "status": f"success_{method}"
-            })
-        else:
-            record["fail_reason"] = "extraction_failed"
+    if content:
+        record.update({
+            "introduction": content,
+            "extraction_method": method,
+            "content_quality": quality,
+            "has_intro": True,
+            "intro_length": len(content),
+            "status": f"success_{method}"
+        })
+    else:
+        record["fail_reason"] = "extraction_failed"
 
     return record
 
