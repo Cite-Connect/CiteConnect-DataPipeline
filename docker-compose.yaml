@@ -36,6 +36,22 @@ x-airflow-common:
     SMTP_USER: ${SMTP_USER}
     SMTP_PASSWORD: ${SMTP_PASSWORD}
 
+    # Bias Analysis & Mitigation
+    BIAS_MITIGATION_MAX_FIELDS: ${BIAS_MITIGATION_MAX_FIELDS:-5}
+
+    # Supabase Database Connection (choose one method)
+    # Method 1: Full DATABASE_URL (recommended)
+    DATABASE_URL: ${DATABASE_URL:-}
+    # Method 2: Individual connection variables (fallback)
+    SUPABASE_DB_HOST: ${SUPABASE_DB_HOST:-}
+    SUPABASE_DB_PORT: ${SUPABASE_DB_PORT:-5432}
+    SUPABASE_DB_NAME: ${SUPABASE_DB_NAME:-postgres}
+    SUPABASE_DB_USER: ${SUPABASE_DB_USER:-postgres}
+    SUPABASE_DB_PASSWORD: ${SUPABASE_DB_PASSWORD:-}
+
+    # Alert Email Configuration
+    ALERT_EMAIL: ${ALERT_EMAIL:-}
+
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/configs/credentials/gcs-key.json
     GCS_BUCKET_NAME: ${GCS_BUCKET_NAME}
     GCS_PROJECT_ID: ${GCS_PROJECT_ID}

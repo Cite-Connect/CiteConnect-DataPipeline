@@ -21,12 +21,12 @@ def search_semantic_scholar(query: str, limit: int = 10, retries: int = 3, api_k
     import re
     
     fields = [
-        "paperId", "externalIds", "title", "abstract", "year", "publicationDate",
-        "venue", "publicationVenue", "publicationTypes", "authors",
-        "citationCount", "influentialCitationCount", "referenceCount",
-        "citations", "references", "fieldsOfStudy", "s2FieldsOfStudy",
-        "isOpenAccess", "openAccessPdf", "tldr"
-    ]
+    "paperId", "externalIds", "title", "abstract", "year", "publicationDate",
+    "venue", "publicationVenue", "publicationTypes", "authors",
+    "citationCount", "influentialCitationCount", "referenceCount",
+    "citations", "references", "fieldsOfStudy", "s2FieldsOfStudy",
+    "isOpenAccess", "openAccessPdf", "tldr"
+]
 
     current_limit = limit
     

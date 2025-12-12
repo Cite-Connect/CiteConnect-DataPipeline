@@ -4,7 +4,7 @@
 
 # Schedule - when to run automatically
 schedule:
-  interval: "@weekly"  # Every Sunday at midnight
+  interval: "0 */2 * * *"  # Every 2 hours
   start_date: "2024-12-08"
   catchup: false
 
@@ -21,7 +21,7 @@ taxonomy:
     enabled: true   # Set false to skip this domain
     priority: 1     # Run first
     search_terms:
-      - "machine_learning"
+      - "machine learning"
       - "Neural Networks"
       - "computer vision"
       - "natural language processing"
