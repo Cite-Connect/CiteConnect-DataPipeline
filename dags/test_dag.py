@@ -499,8 +499,6 @@ def generate_schema_and_stats(**context):
 def upload_to_supabase(**context):
     """Upload papers from GCS to Supabase database"""
     import asyncio
-    import concurrent.futures
-    import threading
     from src.DataPipeline.Processing.upload_papers_to_supabase import upload_papers_to_supabase_async
 
     print("🚀 Starting Supabase upload task...")
@@ -516,38 +514,16 @@ def upload_to_supabase(**context):
 
     print(f"📋 Config: max_papers={max_papers}, batch_size={batch_size}")
 
-    def run_async_upload():
-        """Run the async upload in a separate thread with its own event loop"""
-        try:
-            # Create new event loop for this thread
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            result = loop.run_until_complete(upload_papers_to_supabase_async(
+    try:
+        # Run async function directly with asyncio.run (fresh loop, clean shutdown)
+        result = asyncio.run(
+            upload_papers_to_supabase_async(
                 max_papers=max_papers,
                 batch_size=batch_size
-            ))
-
-            loop.close()
-            return result
-        except Exception as e:
-            print(f"❌ Async upload failed: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
-
-    try:
-        print("🔄 Starting upload in thread...")
-        # Run in thread pool to avoid blocking Airflow
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(run_async_upload)
-            result = future.result(timeout=600)  # 10 minute timeout
-
+            )
+        )
         print(f"✅ Supabase upload completed successfully: {result}")
         return result
-    except concurrent.futures.TimeoutError:
-        print("❌ Upload task timed out after 10 minutes")
-        raise Exception("Upload task timed out")
     except Exception as e:
         print(f"❌ Supabase upload failed: {e}")
         import traceback
